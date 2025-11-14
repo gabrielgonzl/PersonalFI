@@ -4,7 +4,6 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { queryClient } from './config/queryClient';
 import { AppProvider } from './context/AppContext';
-import { ThemeProvider } from './context/ThemeContext';
 import { Layout } from './components/layout/Layout';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { LoadingSpinner } from './components/common/LoadingSpinner';
@@ -46,41 +45,39 @@ function App() {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <ThemeProvider>
-          <AppProvider>
-            <BrowserRouter>
-              <Layout>
-                <Suspense fallback={<LoadingSpinner fullScreen />}>
-                  <Routes>
-                    {/* Dashboard */}
-                    <Route path="/" element={<Dashboard />} />
+        <AppProvider>
+          <BrowserRouter>
+            <Layout>
+              <Suspense fallback={<LoadingSpinner fullScreen />}>
+                <Routes>
+                  {/* Dashboard */}
+                  <Route path="/" element={<Dashboard />} />
 
-                    {/* Assets */}
-                    <Route path="/assets" element={<AssetsList />} />
-                    <Route path="/assets/create" element={<CreateAsset />} />
-                    <Route path="/assets/:id" element={<AssetDetail />} />
-                    <Route path="/assets/:id/edit" element={<CreateAsset />} />
+                  {/* Assets */}
+                  <Route path="/assets" element={<AssetsList />} />
+                  <Route path="/assets/create" element={<CreateAsset />} />
+                  <Route path="/assets/:id" element={<AssetDetail />} />
+                  <Route path="/assets/:id/edit" element={<CreateAsset />} />
 
-                    {/* Portfolios */}
-                    <Route path="/portfolios" element={<PortfoliosList />} />
-                    <Route path="/portfolios/create" element={<CreatePortfolio />} />
-                    <Route path="/portfolios/:id" element={<PortfolioDetail />} />
-                    <Route path="/portfolios/:id/edit" element={<CreatePortfolio />} />
+                  {/* Portfolios */}
+                  <Route path="/portfolios" element={<PortfoliosList />} />
+                  <Route path="/portfolios/create" element={<CreatePortfolio />} />
+                  <Route path="/portfolios/:id" element={<PortfolioDetail />} />
+                  <Route path="/portfolios/:id/edit" element={<CreatePortfolio />} />
 
-                    {/* Analytics */}
-                    <Route path="/analytics" element={<Analytics />} />
+                  {/* Analytics */}
+                  <Route path="/analytics" element={<Analytics />} />
 
-                    {/* Settings */}
-                    <Route path="/settings" element={<Settings />} />
+                  {/* Settings */}
+                  <Route path="/settings" element={<Settings />} />
 
-                    {/* 404 - Redirect to dashboard */}
-                    <Route path="*" element={<Navigate to="/" replace />} />
-                  </Routes>
-                </Suspense>
-              </Layout>
-            </BrowserRouter>
-          </AppProvider>
-        </ThemeProvider>
+                  {/* 404 - Redirect to dashboard */}
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </Suspense>
+            </Layout>
+          </BrowserRouter>
+        </AppProvider>
         {/* React Query Devtools - only in development */}
         {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
       </QueryClientProvider>
