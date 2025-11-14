@@ -25,7 +25,6 @@ const AssetSchema = new mongoose.Schema(
         values: Object.values(ASSET_TYPES),
         message: '{VALUE} no es un tipo válido',
       },
-      index: true,
     },
     currency: {
       type: String,
