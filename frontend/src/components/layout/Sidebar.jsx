@@ -18,10 +18,13 @@ const navigation = [
 export const Sidebar = () => {
   const { sidebarCollapsed, toggleSidebar } = useApp();
 
+  // On mobile, collapsed means hidden. On desktop, always visible.
+  const isHidden = sidebarCollapsed;
+
   return (
     <>
       {/* Mobile overlay */}
-      {!sidebarCollapsed && (
+      {!isHidden && (
         <div
           className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
           onClick={toggleSidebar}
@@ -33,8 +36,7 @@ export const Sidebar = () => {
         className={`
           fixed top-0 left-0 z-50 h-full bg-white border-r border-gray-200
           transform transition-transform duration-300 ease-in-out
-          ${sidebarCollapsed ? '-translate-x-full' : 'translate-x-0'}
-          lg:translate-x-0 lg:static lg:z-30
+          ${isHidden ? '-translate-x-full lg:translate-x-0' : 'translate-x-0'}
           w-64
         `}
       >

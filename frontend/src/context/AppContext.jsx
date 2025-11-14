@@ -27,10 +27,14 @@ export const AppProvider = ({ children }) => {
     return localStorage.getItem(STORAGE_KEYS.CURRENCY) || CURRENCIES[0];
   });
 
-  // Sidebar
+  // Sidebar - Start collapsed on mobile by default
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     const stored = localStorage.getItem(STORAGE_KEYS.SIDEBAR_COLLAPSED);
-    return stored === 'true';
+    if (stored !== null) {
+      return stored === 'true';
+    }
+    // Default: collapsed on mobile (< 1024px), open on desktop
+    return typeof window !== 'undefined' && window.innerWidth < 1024;
   });
 
   // Notifications
