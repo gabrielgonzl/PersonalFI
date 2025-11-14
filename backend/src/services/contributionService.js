@@ -74,7 +74,8 @@ class ContributionService {
     // Si el asset pertenece a un portfolio, validar fondos disponibles para compras
     if (data.type === 'buy' && asset.portfolioId) {
       const portfolio = await Portfolio.findById(asset.portfolioId);
-      const totalAmount = data.quantity * data.pricePerUnit + (data.fees || 0);
+      // Calcular totalAmount de la misma forma que el modelo (ver Contribution.js pre-save hook)
+      const totalAmount = data.totalAmount || (data.quantity * data.pricePerUnit + (data.fees || 0));
 
       if (portfolio && totalAmount > portfolio.cashBalance) {
         throw new AppError(

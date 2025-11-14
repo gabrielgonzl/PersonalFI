@@ -3,6 +3,8 @@
  */
 
 import assetService from '../services/assetService.js';
+import contributionService from '../services/contributionService.js';
+import analyticsService from '../services/analyticsService.js';
 import { successResponse } from '../utils/helpers.js';
 import { HTTP_STATUS } from '../config/constants.js';
 
@@ -98,8 +100,6 @@ class AssetController {
    */
   async getAssetContributions(req, res, next) {
     try {
-      const contributionService = (await import('../services/contributionService.js')).default;
-
       const filters = {
         assetId: req.params.id,
         type: req.query.type,
@@ -131,7 +131,6 @@ class AssetController {
    */
   async getAssetPerformance(req, res, next) {
     try {
-      const analyticsService = (await import('../services/analyticsService.js')).default;
       const period = req.query.period || 'all';
 
       const performance = await analyticsService.getAssetPerformance(req.params.id, period);

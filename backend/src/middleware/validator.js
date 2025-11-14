@@ -3,7 +3,7 @@
  */
 
 import { body, param, query, validationResult } from 'express-validator';
-import { HTTP_STATUS, ERROR_CODES } from '../config/constants.js';
+import { HTTP_STATUS, ERROR_CODES, ASSET_TYPES, CONTRIBUTION_TYPES } from '../config/constants.js';
 import { errorResponse } from '../utils/helpers.js';
 
 /**
@@ -34,7 +34,7 @@ export const assetValidation = {
   create: [
     body('name').trim().notEmpty().withMessage('El nombre es requerido').isLength({ max: 100 }),
     body('symbol').trim().notEmpty().withMessage('El símbolo es requerido').isLength({ max: 20 }).toUpperCase(),
-    body('type').isIn(['crypto', 'stock', 'etf', 'fund', 'other']).withMessage('Tipo de activo inválido'),
+    body('type').isIn(Object.values(ASSET_TYPES)).withMessage('Tipo de activo inválido'),
     body('currency').optional().isLength({ min: 3, max: 3 }).toUpperCase(),
     body('currentPrice').optional().isFloat({ min: 0 }).withMessage('El precio debe ser mayor o igual a 0'),
     body('portfolioId').optional().isMongoId().withMessage('Portfolio ID inválido'),
@@ -72,7 +72,7 @@ export const contributionValidation = {
         }
         return true;
       }),
-    body('type').isIn(['buy', 'sell', 'transfer']).withMessage('Tipo de contribución inválido'),
+    body('type').isIn(Object.values(CONTRIBUTION_TYPES)).withMessage('Tipo de contribución inválido'),
     body('quantity').isFloat({ gt: 0 }).withMessage('La cantidad debe ser mayor a 0'),
     body('pricePerUnit').isFloat({ min: 0 }).withMessage('El precio debe ser mayor o igual a 0'),
     body('fees').optional().isFloat({ min: 0 }).withMessage('Las comisiones deben ser mayor o igual a 0'),

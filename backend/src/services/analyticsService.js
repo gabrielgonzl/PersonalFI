@@ -89,7 +89,10 @@ class AnalyticsService {
     }
 
     // Obtener todas las contribuciones en el período
-    const query = startDate ? { date: { $gte: startDate } } : {};
+    const query = {};
+    if (startDate) {
+      query.date = { $gte: startDate, $lte: endDate };
+    }
     const contributions = await Contribution.find(query).sort({ date: 1 });
 
     // Obtener assets actuales para calcular valores
@@ -289,15 +292,17 @@ class AnalyticsService {
       .sort({ date: -1 })
       .limit(limit);
 
-    const events = contributions.map((contrib) => ({
-      date: contrib.date,
-      type: 'contribution',
-      subType: contrib.type,
-      description: `${contrib.type === 'buy' ? 'Compra' : 'Venta'} de ${contrib.quantity} ${contrib.assetId.symbol} por $${contrib.totalAmount.toFixed(2)}`,
-      assetName: contrib.assetId.name,
-      assetSymbol: contrib.assetId.symbol,
-      amount: contrib.totalAmount,
-    }));
+    const events = contributions
+      .filter((contrib) => contrib.assetId) // Filtrar contribuciones con assets eliminados
+      .map((contrib) => ({
+        date: contrib.date,
+        type: 'contribution',
+        subType: contrib.type,
+        description: `${contrib.type === 'buy' ? 'Compra' : 'Venta'} de ${contrib.quantity} ${contrib.assetId?.symbol || 'N/A'} por $${contrib.totalAmount.toFixed(2)}`,
+        assetName: contrib.assetId?.name || 'Asset eliminado',
+        assetSymbol: contrib.assetId?.symbol || 'N/A',
+        amount: contrib.totalAmount,
+      }));
 
     // Obtener creación de assets
     const recentAssets = await Asset.find().sort({ createdAt: -1 }).limit(10);
