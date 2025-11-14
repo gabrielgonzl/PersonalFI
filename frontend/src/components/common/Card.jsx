@@ -11,8 +11,8 @@ export const Card = ({
   return (
     <div
       className={`
-        bg-white rounded-lg shadow-card
-        ${hover ? 'hover:shadow-card-hover transition-shadow duration-200' : ''}
+        bg-white rounded-xl shadow-sm border border-gray-100
+        ${hover ? 'hover:shadow-md transition-all duration-200 cursor-pointer' : ''}
         ${className}
       `}
       {...props}
