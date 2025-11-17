@@ -39,10 +39,10 @@ export const CreatePortfolio = () => {
       if (!data.icon) delete data.icon;
 
       const result = await createPortfolioMutation.mutateAsync(data);
-      showSuccess('Portfolio created successfully');
+      showSuccess('Cartera creada exitosamente');
       navigate(`/portfolios/${result.data._id}`);
     } catch (error) {
-      showError(error.message || 'Failed to create portfolio');
+      showError(error.message || 'Error al crear la cartera');
     }
   };
 
@@ -56,8 +56,8 @@ export const CreatePortfolio = () => {
           <ArrowBackIcon />
         </Button>
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Create New Portfolio</h1>
-          <p className="text-gray-600 mt-1">Organize your investments into a portfolio</p>
+          <h1 className="text-3xl font-bold text-gray-900">Crear Nueva Cartera</h1>
+          <p className="text-gray-600 mt-1">Organiza tus inversiones en una cartera</p>
         </div>
       </div>
 
@@ -65,30 +65,30 @@ export const CreatePortfolio = () => {
       <Card>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           <Input
-            label="Portfolio Name *"
+            label="Nombre de la Cartera *"
             {...register('name')}
             error={errors.name?.message}
-            placeholder="e.g., My Crypto Portfolio, Retirement Fund"
+            placeholder="ej., Mi Cartera de Crypto, Fondo de Retiro"
           />
 
           <Textarea
-            label="Description"
+            label="Descripción"
             {...register('description')}
             error={errors.description?.message}
-            placeholder="Optional description for this portfolio"
+            placeholder="Descripción opcional para esta cartera"
             rows={3}
           />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Select
-              label="Currency *"
+              label="Moneda *"
               {...register('currency')}
               options={currencyOptions}
               error={errors.currency?.message}
             />
 
             <Input
-              label="Initial Cash Balance"
+              label="Balance Inicial en Efectivo"
               type="number"
               step="any"
               {...register('cashBalance', { valueAsNumber: true })}
@@ -106,10 +106,10 @@ export const CreatePortfolio = () => {
 
           <div className="flex justify-end space-x-3 pt-4 border-t">
             <Button variant="outline" onClick={() => navigate('/portfolios')} type="button">
-              Cancel
+              Cancelar
             </Button>
             <Button type="submit" loading={createPortfolioMutation.isLoading}>
-              Create Portfolio
+              Crear Cartera
             </Button>
           </div>
         </form>
