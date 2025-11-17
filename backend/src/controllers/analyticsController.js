@@ -3,6 +3,7 @@
  */
 
 import analyticsService from '../services/analyticsService.js';
+import benchmarkService from '../services/benchmarkService.js';
 import { successResponse } from '../utils/helpers.js';
 
 class AnalyticsController {
@@ -126,6 +127,19 @@ class AnalyticsController {
     try {
       const recommended = await analyticsService.getRecommendedBenchmark();
       res.json(successResponse(recommended));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * POST /analytics/benchmarks/initialize
+   * NUEVO: Inicializar benchmarks predeterminados
+   */
+  async initializeBenchmarks(req, res, next) {
+    try {
+      const results = await benchmarkService.initializeDefaultBenchmarks();
+      res.json(successResponse(results, 'Benchmarks initialized successfully'));
     } catch (error) {
       next(error);
     }
