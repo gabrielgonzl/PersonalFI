@@ -46,8 +46,8 @@ export const Dashboard = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-600 mt-1">Welcome to your investment tracker</p>
+          <h1 className="text-3xl font-bold text-gray-900">Panel de Control</h1>
+          <p className="text-gray-600 mt-1">Bienvenido a tu gestor de inversiones</p>
         </div>
         <div className="flex flex-wrap gap-3">
           <Button
@@ -56,14 +56,14 @@ export const Dashboard = () => {
             onClick={() => navigate('/portfolios/create')}
             size="md"
           >
-            New Portfolio
+            Nueva Cartera
           </Button>
           <Button
             leftIcon={<AddIcon />}
             onClick={() => navigate('/assets/create')}
             size="md"
           >
-            New Asset
+            Nuevo Activo
           </Button>
         </div>
       </div>
@@ -71,7 +71,7 @@ export const Dashboard = () => {
       {/* Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <MetricCard
-          title="Total Portfolio Value"
+          title="Valor Total de Cartera"
           value={overview?.totalValue || 0}
           change={overview?.totalValueChange}
           currency={currency}
@@ -79,14 +79,14 @@ export const Dashboard = () => {
           loading={overviewLoading}
         />
         <MetricCard
-          title="Total Invested"
+          title="Total Invertido"
           value={overview?.totalInvested || 0}
           currency={currency}
           icon={<TrendingUpIcon className="w-6 h-6" />}
           loading={overviewLoading}
         />
         <MetricCard
-          title="Total Profit/Loss"
+          title="Ganancia/Pérdida Total"
           value={overview?.totalProfitLoss || 0}
           change={overview?.totalProfitLossPercentage}
           currency={currency}
@@ -94,7 +94,7 @@ export const Dashboard = () => {
           loading={overviewLoading}
         />
         <MetricCard
-          title="Number of Assets"
+          title="Número de Activos"
           value={overview?.assetCount || 0}
           currency={currency}
           icon={<PieChartIcon className="w-6 h-6" />}
@@ -105,26 +105,26 @@ export const Dashboard = () => {
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Performance Chart */}
-        <Card title="Portfolio Performance" subtitle="Last 30 days">
+        <Card title="Rendimiento de Cartera" subtitle="Últimos 30 días">
           {performanceLoading ? (
             <Loading />
           ) : performance?.data?.length > 0 ? (
             <LineChart
               data={performance.data}
-              lines={[{ dataKey: 'value', name: 'Portfolio Value', color: '#0ea5e9' }]}
+              lines={[{ dataKey: 'value', name: 'Valor de Cartera', color: '#0ea5e9' }]}
               currency={currency}
               height={300}
             />
           ) : (
             <EmptyState
-              title="No performance data"
-              description="Start adding assets to see your portfolio performance"
+              title="Sin datos de rendimiento"
+              description="Comienza a agregar activos para ver el rendimiento de tu cartera"
             />
           )}
         </Card>
 
         {/* Distribution Chart */}
-        <Card title="Asset Distribution" subtitle="By type">
+        <Card title="Distribución de Activos" subtitle="Por tipo">
           {distributionLoading ? (
             <Loading />
           ) : distribution?.byType?.length > 0 ? (
@@ -137,8 +137,8 @@ export const Dashboard = () => {
             />
           ) : (
             <EmptyState
-              title="No distribution data"
-              description="Add assets to see distribution breakdown"
+              title="Sin datos de distribución"
+              description="Agrega activos para ver el desglose de distribución"
             />
           )}
         </Card>
@@ -148,9 +148,9 @@ export const Dashboard = () => {
       {portfolios.length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-bold text-gray-900">Your Portfolios</h2>
+            <h2 className="text-2xl font-bold text-gray-900">Tus Carteras</h2>
             <Button variant="ghost" onClick={() => navigate('/portfolios')}>
-              View All
+              Ver Todas
             </Button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -169,9 +169,9 @@ export const Dashboard = () => {
       {assets.length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-bold text-gray-900">Recent Assets</h2>
+            <h2 className="text-2xl font-bold text-gray-900">Activos Recientes</h2>
             <Button variant="ghost" onClick={() => navigate('/assets')}>
-              View All
+              Ver Todos
             </Button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -191,8 +191,8 @@ export const Dashboard = () => {
         <Card>
           <EmptyState
             icon={<AccountBalanceWalletIcon />}
-            title="Welcome to Growing!"
-            description="Start tracking your investments by creating your first portfolio or adding an asset"
+            title="¡Bienvenido a Growing!"
+            description="Comienza a rastrear tus inversiones creando tu primera cartera o agregando un activo"
             action={
               <div className="flex space-x-3">
                 <Button
@@ -200,13 +200,13 @@ export const Dashboard = () => {
                   leftIcon={<AddIcon />}
                   onClick={() => navigate('/portfolios/create')}
                 >
-                  Create Portfolio
+                  Crear Cartera
                 </Button>
                 <Button
                   leftIcon={<AddIcon />}
                   onClick={() => navigate('/assets/create')}
                 >
-                  Add Asset
+                  Agregar Activo
                 </Button>
               </div>
             }

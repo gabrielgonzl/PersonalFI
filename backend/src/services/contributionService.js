@@ -71,6 +71,17 @@ class ContributionService {
       throw new AppError('Asset no encontrado', HTTP_STATUS.NOT_FOUND, ERROR_CODES.RESOURCE_NOT_FOUND);
     }
 
+    // Validar cantidad disponible para ventas
+    if (data.type === 'sell') {
+      if (data.quantity > asset.quantity) {
+        throw new AppError(
+          `Cantidad insuficiente para vender. Disponible: ${asset.quantity}, Intentando vender: ${data.quantity}`,
+          HTTP_STATUS.UNPROCESSABLE_ENTITY,
+          ERROR_CODES.INSUFFICIENT_FUNDS
+        );
+      }
+    }
+
     // Si el asset pertenece a un portfolio, validar fondos disponibles para compras
     if (data.type === 'buy' && asset.portfolioId) {
       const portfolio = await Portfolio.findById(asset.portfolioId);

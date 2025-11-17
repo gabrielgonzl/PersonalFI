@@ -19,7 +19,7 @@ export const AppProvider = ({ children }) => {
 
   // Language
   const [language, setLanguage] = useState(() => {
-    return localStorage.getItem(STORAGE_KEYS.LANGUAGE) || LANGUAGES.EN;
+    return localStorage.getItem(STORAGE_KEYS.LANGUAGE) || LANGUAGES.ES;
   });
 
   // Currency

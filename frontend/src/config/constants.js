@@ -18,14 +18,14 @@ export const ASSET_TYPES = {
 };
 
 export const ASSET_TYPE_LABELS = {
-  [ASSET_TYPES.CRYPTO]: 'Cryptocurrency',
-  [ASSET_TYPES.STOCK]: 'Stock',
+  [ASSET_TYPES.CRYPTO]: 'Criptomoneda',
+  [ASSET_TYPES.STOCK]: 'Acción',
   [ASSET_TYPES.ETF]: 'ETF',
-  [ASSET_TYPES.FUND]: 'Fund',
-  [ASSET_TYPES.BOND]: 'Bond',
+  [ASSET_TYPES.FUND]: 'Fondo',
+  [ASSET_TYPES.BOND]: 'Bono',
   [ASSET_TYPES.COMMODITY]: 'Commodity',
-  [ASSET_TYPES.REAL_ESTATE]: 'Real Estate',
-  [ASSET_TYPES.OTHER]: 'Other',
+  [ASSET_TYPES.REAL_ESTATE]: 'Bienes Raíces',
+  [ASSET_TYPES.OTHER]: 'Otro',
 };
 
 // Contribution Types
@@ -37,14 +37,14 @@ export const CONTRIBUTION_TYPES = {
 };
 
 export const CONTRIBUTION_TYPE_LABELS = {
-  [CONTRIBUTION_TYPES.BUY]: 'Buy',
-  [CONTRIBUTION_TYPES.SELL]: 'Sell',
-  [CONTRIBUTION_TYPES.TRANSFER_IN]: 'Transfer In',
-  [CONTRIBUTION_TYPES.TRANSFER_OUT]: 'Transfer Out',
+  [CONTRIBUTION_TYPES.BUY]: 'Compra',
+  [CONTRIBUTION_TYPES.SELL]: 'Venta',
+  [CONTRIBUTION_TYPES.TRANSFER_IN]: 'Transferencia Entrante',
+  [CONTRIBUTION_TYPES.TRANSFER_OUT]: 'Transferencia Saliente',
 };
 
 // Currencies
-export const CURRENCIES = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF', 'CNY'];
+export const CURRENCIES = ['EUR', 'USD', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF', 'CNY'];
 
 // Date Ranges
 export const DATE_RANGES = {
@@ -58,13 +58,13 @@ export const DATE_RANGES = {
 };
 
 export const DATE_RANGE_LABELS = {
-  [DATE_RANGES.TODAY]: 'Today',
-  [DATE_RANGES.WEEK]: '1 Week',
-  [DATE_RANGES.MONTH]: '1 Month',
-  [DATE_RANGES.THREE_MONTHS]: '3 Months',
-  [DATE_RANGES.SIX_MONTHS]: '6 Months',
-  [DATE_RANGES.YEAR]: '1 Year',
-  [DATE_RANGES.ALL]: 'All Time',
+  [DATE_RANGES.TODAY]: 'Hoy',
+  [DATE_RANGES.WEEK]: '1 Semana',
+  [DATE_RANGES.MONTH]: '1 Mes',
+  [DATE_RANGES.THREE_MONTHS]: '3 Meses',
+  [DATE_RANGES.SIX_MONTHS]: '6 Meses',
+  [DATE_RANGES.YEAR]: '1 Año',
+  [DATE_RANGES.ALL]: 'Todo el Tiempo',
 };
 
 // Chart Types
