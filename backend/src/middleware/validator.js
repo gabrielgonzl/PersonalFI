@@ -52,7 +52,25 @@ export const assetValidation = {
 
   updatePrice: [
     param('id').isMongoId().withMessage('ID de asset inválido'),
-    body('currentPrice').isFloat({ min: 0 }).withMessage('El precio debe ser mayor o igual a 0'),
+    body('currentPrice')
+      .optional()
+      .isFloat({ min: 0 })
+      .withMessage('El precio debe ser mayor o igual a 0'),
+    body('price')
+      .optional()
+      .isFloat({ min: 0 })
+      .withMessage('El precio debe ser mayor o igual a 0'),
+    body('newPrice')
+      .optional()
+      .isFloat({ min: 0 })
+      .withMessage('El precio debe ser mayor o igual a 0'),
+    body()
+      .custom((value) => {
+        if (!value.currentPrice && !value.price && !value.newPrice) {
+          throw new Error('Se requiere currentPrice, price o newPrice');
+        }
+        return true;
+      }),
     validate,
   ],
 };
