@@ -574,9 +574,27 @@ class AnalyticsService {
   }
 
   /**
-   * NUEVO: Obtener benchmark recomendado
+   * NUEVO: Obtener benchmark recomendado o preferido del usuario
    */
   async getRecommendedBenchmark() {
+    // Primero intentar obtener el benchmark preferido del usuario
+    const { Settings } = await import('../models/index.js');
+    const settings = await Settings.getInstance();
+
+    if (settings && settings.preferredBenchmark) {
+      const benchmarks = await benchmarkService.getActiveBenchmarks();
+      const preferred = benchmarks.find((b) => b.symbol === settings.preferredBenchmark);
+
+      if (preferred) {
+        return {
+          symbol: preferred.symbol,
+          name: preferred.name,
+          reason: 'Benchmark seleccionado por el usuario',
+        };
+      }
+    }
+
+    // Si no hay benchmark preferido o no existe, usar el recomendado automáticamente
     const assets = await Asset.find();
     return benchmarkService.getRecommendedBenchmark(assets);
   }

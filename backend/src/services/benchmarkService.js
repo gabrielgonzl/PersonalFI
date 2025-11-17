@@ -309,7 +309,7 @@ class BenchmarkService {
    */
   async getRecommendedBenchmark(assets) {
     if (!assets || assets.length === 0) {
-      return { symbol: 'SPY', name: 'S&P 500' };
+      return { symbol: 'SPY', name: 'S&P 500', reason: 'Default benchmark' };
     }
 
     // Contar assets por tipo
@@ -336,6 +336,16 @@ class BenchmarkService {
 
     const recommendedSymbol = typeToBenchmark[dominantType] || 'SPY';
     const benchmark = await Benchmark.getBySymbol(recommendedSymbol);
+
+    // Si no existe el benchmark en la BD, retornar fallback
+    if (!benchmark) {
+      console.warn(`Benchmark ${recommendedSymbol} not found in database. Run seeder to populate benchmarks.`);
+      return {
+        symbol: recommendedSymbol,
+        name: recommendedSymbol === 'BTC' ? 'Bitcoin' : recommendedSymbol === 'SPY' ? 'S&P 500' : 'Market Index',
+        reason: `Portfolio dominado por ${dominantType} (benchmark no inicializado)`,
+      };
+    }
 
     return {
       symbol: benchmark.symbol,
