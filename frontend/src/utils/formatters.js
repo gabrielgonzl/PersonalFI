@@ -1,4 +1,5 @@
 import { format, formatDistanceToNow, isToday, isYesterday } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 /**
  * Format currency value
@@ -7,16 +8,16 @@ import { format, formatDistanceToNow, isToday, isYesterday } from 'date-fns';
  * @param {boolean} compact - Whether to use compact notation (K, M, B)
  * @returns {string} Formatted currency string
  */
-export const formatCurrency = (value, currency = 'USD', compact = false) => {
+export const formatCurrency = (value, currency = 'EUR', compact = false) => {
   if (value === null || value === undefined || isNaN(value)) {
-    return `${getCurrencySymbol(currency)}0.00`;
+    return `${getCurrencySymbol(currency)}0,00`;
   }
 
   if (compact) {
     return formatCompactCurrency(value, currency);
   }
 
-  return new Intl.NumberFormat('en-US', {
+  return new Intl.NumberFormat('es-ES', {
     style: 'currency',
     currency: currency,
     minimumFractionDigits: 2,
@@ -27,7 +28,7 @@ export const formatCurrency = (value, currency = 'USD', compact = false) => {
 /**
  * Format currency in compact notation (1.2K, 3.5M, etc.)
  */
-export const formatCompactCurrency = (value, currency = 'USD') => {
+export const formatCompactCurrency = (value, currency = 'EUR') => {
   if (value === null || value === undefined || isNaN(value)) {
     return `${getCurrencySymbol(currency)}0`;
   }
@@ -37,13 +38,13 @@ export const formatCompactCurrency = (value, currency = 'USD') => {
   const symbol = getCurrencySymbol(currency);
 
   if (absValue >= 1000000000) {
-    return `${sign}${symbol}${(absValue / 1000000000).toFixed(1)}B`;
+    return `${sign}${(absValue / 1000000000).toFixed(1).replace('.', ',')}${symbol}B`;
   } else if (absValue >= 1000000) {
-    return `${sign}${symbol}${(absValue / 1000000).toFixed(1)}M`;
+    return `${sign}${(absValue / 1000000).toFixed(1).replace('.', ',')}${symbol}M`;
   } else if (absValue >= 1000) {
-    return `${sign}${symbol}${(absValue / 1000).toFixed(1)}K`;
+    return `${sign}${(absValue / 1000).toFixed(1).replace('.', ',')}${symbol}K`;
   } else {
-    return `${sign}${symbol}${absValue.toFixed(2)}`;
+    return `${sign}${absValue.toFixed(2).replace('.', ',')}${symbol}`;
   }
 };
 
@@ -72,7 +73,7 @@ export const formatNumber = (value, decimals = 2) => {
     return '0';
   }
 
-  return new Intl.NumberFormat('en-US', {
+  return new Intl.NumberFormat('es-ES', {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   }).format(value);
@@ -106,7 +107,7 @@ export const formatDateTime = (date) => {
 };
 
 /**
- * Format relative time (e.g., "2 hours ago")
+ * Format relative time (e.g., "hace 2 horas")
  * @param {string|Date} date - The date to format
  * @returns {string} Relative time string
  */
@@ -117,11 +118,11 @@ export const formatRelativeTime = (date) => {
     const dateObj = typeof date === 'string' ? new Date(date) : date;
 
     if (isToday(dateObj)) {
-      return `Today at ${format(dateObj, 'HH:mm')}`;
+      return `Hoy a las ${format(dateObj, 'HH:mm', { locale: es })}`;
     } else if (isYesterday(dateObj)) {
-      return `Yesterday at ${format(dateObj, 'HH:mm')}`;
+      return `Ayer a las ${format(dateObj, 'HH:mm', { locale: es })}`;
     } else {
-      return formatDistanceToNow(dateObj, { addSuffix: true });
+      return formatDistanceToNow(dateObj, { addSuffix: true, locale: es });
     }
   } catch (error) {
     console.error('Error formatting relative time:', error);
