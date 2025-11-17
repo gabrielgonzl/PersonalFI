@@ -123,7 +123,7 @@ class PriceController {
         }
       }
 
-      res.json(successResponse(results, \`Updated \${results.updated} assets\`));
+      res.json(successResponse(results, `Updated ${results.updated} assets`));
     } catch (error) {
       next(error);
     }
@@ -158,7 +158,7 @@ class PriceController {
       res.json(successResponse({
         asset: updatedAsset,
         priceData,
-      }, \`Price updated: $\${priceData.price}\`));
+      }, `Price updated: $${priceData.price}`));
     } catch (error) {
       next(error);
     }

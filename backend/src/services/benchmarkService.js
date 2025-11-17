@@ -324,7 +324,7 @@ class BenchmarkService {
     );
 
     // Mapeo de tipos a benchmarks
-    const typeToB enchmark = {
+    const typeToBenchmark = {
       crypto: 'BTC',
       stock: 'SPY',
       etf: 'SPY',
@@ -334,7 +334,7 @@ class BenchmarkService {
       real_estate: 'SPY',
     };
 
-    const recommendedSymbol = typeToB enchmark[dominantType] || 'SPY';
+    const recommendedSymbol = typeToBenchmark[dominantType] || 'SPY';
     const benchmark = await Benchmark.getBySymbol(recommendedSymbol);
 
     return {

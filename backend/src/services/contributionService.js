@@ -86,6 +86,8 @@ class ContributionService {
         HTTP_STATUS.BAD_REQUEST,
         ERROR_CODES.VALIDATION_ERROR
       );
+    }
+
     // Validar cantidad disponible para ventas
     if (data.type === 'sell') {
       if (data.quantity > asset.quantity) {

@@ -27,7 +27,7 @@ const isAutoMode = () => {
 const getFromCache = (key) => {
   const cached = priceCache.get(key);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-    logger.debug(\`Price cache HIT for \${key}\`);
+    logger.debug(`Price cache HIT for \${key}`);
     return cached.data;
   }
   return null;
@@ -47,9 +47,9 @@ const saveToCache = (key, data) => {
  * Hacer petición a RapidAPI
  */
 const fetchFromRapidAPI = async (endpoint, symbol) => {
-  const url = \`https://\${RAPIDAPI_HOST}\${endpoint}\`;
+  const url = `https://\${RAPIDAPI_HOST}\${endpoint}`;
 
-  logger.debug(\`Fetching from RapidAPI: \${endpoint} for \${symbol}\`);
+  logger.debug(`Fetching from RapidAPI: \${endpoint} for \${symbol}`);
 
   try {
     const response = await fetch(url, {
@@ -61,13 +61,13 @@ const fetchFromRapidAPI = async (endpoint, symbol) => {
     });
 
     if (!response.ok) {
-      throw new Error(\`RapidAPI responded with status: \${response.status}\`);
+      throw new Error(`RapidAPI responded with status: \${response.status}`);
     }
 
     const data = await response.json();
     return data;
   } catch (error) {
-    logger.error(\`RapidAPI fetch error for \${symbol}:\`, error.message);
+    logger.error(`RapidAPI fetch error for \${symbol}:`, error.message);
     throw error;
   }
 };
@@ -81,13 +81,13 @@ const fetchFromRapidAPI = async (endpoint, symbol) => {
 export const fetchCurrentPrice = async (symbol, type = 'stock') => {
   // Modo manual: retornar null
   if (!isAutoMode()) {
-    logger.debug(\`Price fetch requested for \${symbol} (\${type}) - MANUAL MODE: returning null\`);
+    logger.debug(`Price fetch requested for \${symbol} (\${type}) - MANUAL MODE: returning null`);
     return null;
   }
 
   try {
     // Verificar caché
-    const cacheKey = \`current_\${symbol}\`;
+    const cacheKey = `current_\${symbol}`;
     const cached = getFromCache(cacheKey);
     if (cached) {
       return cached;
@@ -96,11 +96,11 @@ export const fetchCurrentPrice = async (symbol, type = 'stock') => {
     // Formatear símbolo para crypto (agregar -USD si no está)
     let formattedSymbol = symbol.toUpperCase();
     if (type === 'crypto' && !formattedSymbol.includes('-USD') && !formattedSymbol.includes('USD')) {
-      formattedSymbol = \`\${formattedSymbol}-USD\`;
+      formattedSymbol = `\${formattedSymbol}-USD`;
     }
 
     // Obtener cotización de RapidAPI
-    const data = await fetchFromRapidAPI(\`/quote/\${formattedSymbol}\`, formattedSymbol);
+    const data = await fetchFromRapidAPI(`/quote/\${formattedSymbol}`, formattedSymbol);
 
     // Extraer información relevante
     if (data && data.quoteResponse && data.quoteResponse.result && data.quoteResponse.result.length > 0) {
@@ -124,16 +124,16 @@ export const fetchCurrentPrice = async (symbol, type = 'stock') => {
       // Guardar en caché
       saveToCache(cacheKey, priceData);
 
-      logger.info(\`Price fetched for \${symbol}: $\${priceData.price} (\${priceData.changePercent.toFixed(2)}%)\`);
+      logger.info(`Price fetched for \${symbol}: $\${priceData.price} (\${priceData.changePercent.toFixed(2)}%)`);
 
       return priceData;
     }
 
-    logger.warn(\`No price data found for \${symbol}\`);
+    logger.warn(`No price data found for \${symbol}`);
     return null;
 
   } catch (error) {
-    logger.error(\`Error fetching current price for \${symbol}:\`, error.message);
+    logger.error(`Error fetching current price for \${symbol}:`, error.message);
     return null;
   }
 };
@@ -149,13 +149,13 @@ export const fetchCurrentPrice = async (symbol, type = 'stock') => {
 export const fetchHistoricalPrices = async (symbol, startDate, endDate, interval = '1d') => {
   // Modo manual: retornar null
   if (!isAutoMode()) {
-    logger.debug(\`Historical prices requested for \${symbol} - MANUAL MODE: returning null\`);
+    logger.debug(`Historical prices requested for \${symbol} - MANUAL MODE: returning null`);
     return null;
   }
 
   try {
     // Verificar caché
-    const cacheKey = \`historical_\${symbol}_\${startDate}_\${endDate}_\${interval}\`;
+    const cacheKey = `historical_\${symbol}_\${startDate}_\${endDate}_\${interval}`;
     const cached = getFromCache(cacheKey);
     if (cached) {
       return cached;
@@ -166,7 +166,7 @@ export const fetchHistoricalPrices = async (symbol, startDate, endDate, interval
     const period2 = Math.floor(new Date(endDate).getTime() / 1000);
 
     // Obtener datos históricos de RapidAPI
-    const endpoint = \`/chart/\${symbol}?period1=\${period1}&period2=\${period2}&interval=\${interval}\`;
+    const endpoint = `/chart/\${symbol}?period1=\${period1}&period2=\${period2}&interval=\${interval}`;
     const data = await fetchFromRapidAPI(endpoint, symbol);
 
     // Extraer datos de precios
@@ -193,16 +193,16 @@ export const fetchHistoricalPrices = async (symbol, startDate, endDate, interval
       // Guardar en caché
       saveToCache(cacheKey, historicalData);
 
-      logger.info(\`Historical prices fetched for \${symbol}: \${historicalData.length} data points\`);
+      logger.info(`Historical prices fetched for \${symbol}: \${historicalData.length} data points`);
 
       return historicalData;
     }
 
-    logger.warn(\`No historical data found for \${symbol}\`);
+    logger.warn(`No historical data found for \${symbol}`);
     return null;
 
   } catch (error) {
-    logger.error(\`Error fetching historical prices for \${symbol}:\`, error.message);
+    logger.error(`Error fetching historical prices for \${symbol}:`, error.message);
     return null;
   }
 };
@@ -215,7 +215,7 @@ export const fetchHistoricalPrices = async (symbol, startDate, endDate, interval
 export const updateAssetsPrices = async (assets) => {
   // Modo manual: skip
   if (!isAutoMode()) {
-    logger.debug(\`Bulk price update requested for \${assets.length} assets - MANUAL MODE: skipping\`);
+    logger.debug(`Bulk price update requested for \${assets.length} assets - MANUAL MODE: skipping`);
     return {
       updated: 0,
       failed: 0,
@@ -232,7 +232,7 @@ export const updateAssetsPrices = async (assets) => {
     details: [],
   };
 
-  logger.info(\`Starting bulk price update for \${assets.length} assets\`);
+  logger.info(`Starting bulk price update for \${assets.length} assets`);
 
   for (const asset of assets) {
     try {
@@ -269,7 +269,7 @@ export const updateAssetsPrices = async (assets) => {
           status: 'updated',
         });
 
-        logger.debug(\`Updated price for \${asset.symbol}: $\${priceData.price}\`);
+        logger.debug(`Updated price for \${asset.symbol}: $\${priceData.price}`);
       } else {
         results.failed++;
         results.details.push({
@@ -291,11 +291,11 @@ export const updateAssetsPrices = async (assets) => {
         status: 'error',
         reason: error.message,
       });
-      logger.error(\`Failed to update price for \${asset.symbol}:\`, error.message);
+      logger.error(`Failed to update price for \${asset.symbol}:`, error.message);
     }
   }
 
-  logger.info(\`Bulk price update completed: \${results.updated} updated, \${results.failed} failed, \${results.skipped} skipped\`);
+  logger.info(`Bulk price update completed: \${results.updated} updated, \${results.failed} failed, \${results.skipped} skipped`);
 
   return results;
 };
@@ -309,7 +309,7 @@ export const updateAssetsPrices = async (assets) => {
 export const validateSymbol = async (symbol, type = 'stock') => {
   // Modo manual: aceptar cualquier símbolo
   if (!isAutoMode()) {
-    logger.debug(\`Symbol validation requested for \${symbol} - MANUAL MODE: returning true\`);
+    logger.debug(`Symbol validation requested for \${symbol} - MANUAL MODE: returning true`);
     return true;
   }
 
@@ -317,7 +317,7 @@ export const validateSymbol = async (symbol, type = 'stock') => {
     const priceData = await fetchCurrentPrice(symbol, type);
     return priceData !== null;
   } catch (error) {
-    logger.error(\`Symbol validation failed for \${symbol}:\`, error.message);
+    logger.error(`Symbol validation failed for \${symbol}:`, error.message);
     return false;
   }
 };
@@ -330,12 +330,12 @@ export const validateSymbol = async (symbol, type = 'stock') => {
 export const searchSymbols = async (query) => {
   // Modo manual: retornar vacío
   if (!isAutoMode()) {
-    logger.debug(\`Symbol search requested for "\${query}" - MANUAL MODE: returning empty\`);
+    logger.debug(`Symbol search requested for "\${query}" - MANUAL MODE: returning empty`);
     return [];
   }
 
   try {
-    const data = await fetchFromRapidAPI(\`/auto-complete?q=\${encodeURIComponent(query)}\`, query);
+    const data = await fetchFromRapidAPI(`/auto-complete?q=\${encodeURIComponent(query)}`, query);
 
     if (data && data.ResultSet && data.ResultSet.Result) {
       return data.ResultSet.Result.map(item => ({
@@ -348,7 +348,7 @@ export const searchSymbols = async (query) => {
 
     return [];
   } catch (error) {
-    logger.error(\`Symbol search error for "\${query}":\`, error.message);
+    logger.error(`Symbol search error for "\${query}":`, error.message);
     return [];
   }
 };
@@ -373,7 +373,7 @@ export const getPriceServiceInfo = () => {
 export const clearPriceCache = () => {
   const size = priceCache.size;
   priceCache.clear();
-  logger.info(\`Price cache cleared: \${size} entries removed\`);
+  logger.info(`Price cache cleared: \${size} entries removed`);
   return { cleared: size };
 };
 
