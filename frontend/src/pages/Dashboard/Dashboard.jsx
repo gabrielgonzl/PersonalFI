@@ -43,6 +43,9 @@ export const Dashboard = () => {
   const portfolios = portfoliosData?.data || [];
   const assets = assetsData?.data || [];
 
+  // Extract summary from analytics overview
+  const summary = overview?.data?.summary || {};
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-gray-50">
       <div className="space-y-8 pb-8">
@@ -59,23 +62,23 @@ export const Dashboard = () => {
               ) : (
                 <>
                   <p className="text-5xl md:text-6xl font-bold text-white mb-3">
-                    {formatCurrency(overview?.totalValue || 0, currency)}
+                    {formatCurrency(summary.totalValue || 0, currency)}
                   </p>
-                  {overview?.totalProfitLoss !== undefined && (
+                  {summary.profitLoss !== undefined && (
                     <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full ${
-                      overview.totalProfitLoss >= 0
+                      summary.profitLoss >= 0
                         ? 'bg-success-500/20 text-white'
                         : 'bg-danger-500/20 text-white'
                     }`}>
-                      {overview.totalProfitLoss >= 0 ? (
+                      {summary.profitLoss >= 0 ? (
                         <TrendingUpIcon className="w-5 h-5" />
                       ) : (
                         <ShowChartIcon className="w-5 h-5" />
                       )}
                       <span className="font-semibold text-lg">
-                        {overview.totalProfitLoss >= 0 ? '+' : ''}
-                        {formatCurrency(overview.totalProfitLoss, currency)}
-                        {' '}({overview.totalProfitLossPercentage?.toFixed(2)}%)
+                        {summary.profitLoss >= 0 ? '+' : ''}
+                        {formatCurrency(summary.profitLoss, currency)}
+                        {' '}({summary.profitLossPercentage?.toFixed(2)}%)
                       </span>
                     </div>
                   )}
@@ -108,7 +111,7 @@ export const Dashboard = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <MetricCard
             title="Total Invertido"
-            value={overview?.totalInvested || 0}
+            value={summary.totalInvested || 0}
             currency={currency}
             icon={<TrendingUpIcon className="w-6 h-6" />}
             iconColor="text-primary-600"
@@ -116,16 +119,16 @@ export const Dashboard = () => {
           />
           <MetricCard
             title="Ganancia/Pérdida Total"
-            value={overview?.totalProfitLoss || 0}
-            change={overview?.totalProfitLossPercentage}
+            value={summary.profitLoss || 0}
+            change={summary.profitLossPercentage}
             currency={currency}
             icon={<ShowChartIcon className="w-6 h-6" />}
-            iconColor={overview?.totalProfitLoss >= 0 ? 'text-success-600' : 'text-danger-600'}
+            iconColor={summary.profitLoss >= 0 ? 'text-success-600' : 'text-danger-600'}
             loading={overviewLoading}
           />
           <MetricCard
             title="Número de Activos"
-            value={overview?.assetCount || 0}
+            value={summary.assetsCount || 0}
             currency={currency}
             icon={<PieChartIcon className="w-6 h-6" />}
             iconColor="text-warning-600"
@@ -170,9 +173,9 @@ export const Dashboard = () => {
               <div className="flex items-center justify-center h-80">
                 <Loading />
               </div>
-            ) : distribution?.byType?.length > 0 ? (
+            ) : distribution?.data?.byType?.length > 0 ? (
               <PieChart
-                data={distribution.byType}
+                data={distribution.data.byType}
                 nameKey="type"
                 valueKey="value"
                 currency={currency}

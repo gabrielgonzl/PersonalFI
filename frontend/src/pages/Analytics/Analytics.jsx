@@ -82,9 +82,9 @@ export const Analytics = () => {
             <div className="flex items-center justify-center h-80">
               <Loading />
             </div>
-          ) : distribution?.byType?.length > 0 ? (
+          ) : distribution?.data?.byType?.length > 0 ? (
             <PieChart
-              data={distribution.byType.map(item => ({
+              data={distribution.data.byType.map(item => ({
                 name: ASSET_TYPE_LABELS[item.type] || item.type,
                 value: item.value,
               }))}
@@ -107,9 +107,9 @@ export const Analytics = () => {
             <div className="flex items-center justify-center h-80">
               <Loading />
             </div>
-          ) : distribution?.byPortfolio?.length > 0 ? (
+          ) : distribution?.data?.byPortfolio?.length > 0 ? (
             <PieChart
-              data={distribution.byPortfolio.map(item => ({
+              data={distribution.data.byPortfolio.map(item => ({
                 name: item.portfolioName || 'Independiente',
                 value: item.value,
                 color: item.color,

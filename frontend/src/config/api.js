@@ -1,19 +1,5 @@
 import axios from 'axios';
 import { API_BASE_URL } from './constants';
-import {
-  mockAssets,
-  mockPortfolios,
-  mockAnalyticsOverview,
-  mockPerformanceData,
-  mockDistributionData,
-  mockTopPerformers,
-  mockTimelineData,
-  mockContributions,
-  mockSettings,
-} from '../utils/mockData';
-
-// Modo de desarrollo - usar datos mock solo si se especifica explícitamente en variables de entorno
-const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA === 'true';
 
 // Create axios instance
 const api = axios.create({
@@ -24,28 +10,7 @@ const api = axios.create({
   },
 });
 
-// Mock API responses
-const mockResponses = {
-  'GET /assets': () => ({ success: true, count: mockAssets.length, data: mockAssets }),
-  'GET /assets/:id': (id) => {
-    const asset = mockAssets.find(a => a._id === id);
-    return asset ? { success: true, data: asset } : null;
-  },
-  'GET /portfolios': () => ({ success: true, count: mockPortfolios.length, data: mockPortfolios }),
-  'GET /portfolios/:id': (id) => {
-    const portfolio = mockPortfolios.find(p => p._id === id);
-    return portfolio ? { success: true, data: portfolio } : null;
-  },
-  'GET /analytics/overview': () => ({ success: true, data: mockAnalyticsOverview }),
-  'GET /analytics/performance': () => ({ success: true, data: mockPerformanceData }),
-  'GET /analytics/distribution': () => ({ success: true, data: mockDistributionData }),
-  'GET /analytics/top-performers': () => ({ success: true, data: mockTopPerformers }),
-  'GET /analytics/timeline': () => ({ success: true, data: mockTimelineData }),
-  'GET /contributions': () => ({ success: true, count: mockContributions.length, data: mockContributions }),
-  'GET /settings': () => ({ success: true, data: mockSettings }),
-};
-
-// Request interceptor
+// Request interceptor for logging and adding auth tokens
 api.interceptors.request.use(
   (config) => {
     console.log('[API Request]', {
@@ -54,11 +19,15 @@ api.interceptors.request.use(
       data: config.data,
     });
 
+    // Add request timing metadata
+    config.metadata = { startTime: Date.now() };
+
     // You can add auth token here in the future
     // const token = localStorage.getItem('token');
     // if (token) {
     //   config.headers.Authorization = `Bearer ${token}`;
     // }
+
     return config;
   },
   (error) => {
@@ -66,11 +35,12 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor with mock data support
+// Response interceptor for unwrapping data and error handling
 api.interceptors.response.use(
   (response) => {
-    const duration = response.config.metadata?.endTime
-      ? `${response.config.metadata.endTime - response.config.metadata.startTime}ms`
+    // Calculate request duration
+    const duration = response.config.metadata?.startTime
+      ? `${Date.now() - response.config.metadata.startTime}ms`
       : 'N/A';
 
     console.log('[API Response]', {
@@ -79,40 +49,21 @@ api.interceptors.response.use(
       data: response.data,
     });
 
+    // Backend devuelve: { success: true, data: {...}, count?: number }
+    // Devolvemos response.data directamente para que los hooks puedan acceder a .data
     return response.data;
   },
-  async (error) => {
-    // Si usamos mock data y hay un error de red, devolver datos mock
-    if (USE_MOCK_DATA && (error.code === 'ERR_NETWORK' || error.code === 'ECONNREFUSED')) {
-      const { method, url } = error.config;
-      const mockKey = `${method.toUpperCase()} ${url.split('?')[0]}`;
-
-      console.warn('[API Mock]', `Using mock data for ${mockKey}`);
-
-      // Buscar respuesta mock
-      for (const [key, mockFn] of Object.entries(mockResponses)) {
-        if (key.includes(':id')) {
-          const baseKey = key.split('/:id')[0];
-          if (mockKey.startsWith(baseKey.replace('GET ', 'GET '))) {
-            const id = url.split('/').pop().split('?')[0];
-            const mockData = mockFn(id);
-            if (mockData) {
-              return Promise.resolve(mockData);
-            }
-          }
-        } else if (mockKey.includes(key.replace('GET ', ''))) {
-          return Promise.resolve(mockFn());
-        }
-      }
-
-      // Si no hay mock específico, devolver array vacío
-      return Promise.resolve({ success: true, data: [], count: 0 });
-    }
-
+  (error) => {
     // Handle errors
     if (error.response) {
-      // Server responded with error
+      // Server responded with error status
       const errorData = error.response.data;
+
+      console.error('[API Error]', {
+        status: error.response.status,
+        message: errorData.message || errorData.error?.message,
+        url: error.config?.url,
+      });
 
       // Create structured error object
       const structuredError = {
@@ -124,14 +75,21 @@ api.interceptors.response.use(
 
       return Promise.reject(structuredError);
     } else if (error.request) {
-      // Request made but no response
+      // Request made but no response received
+      console.error('[API Network Error]', {
+        message: 'No se recibió respuesta del servidor',
+        url: error.config?.url,
+      });
+
       return Promise.reject({
-        message: 'Error de red. Por favor verifica tu conexión.',
+        message: 'Error de red. Por favor verifica tu conexión y que el backend esté funcionando.',
         code: 'NETWORK_ERROR',
         statusCode: 0,
       });
     } else {
       // Something else happened
+      console.error('[API Unexpected Error]', error.message);
+
       return Promise.reject({
         message: error.message || 'Ha ocurrido un error inesperado',
         code: 'UNKNOWN_ERROR',
@@ -140,22 +98,5 @@ api.interceptors.response.use(
     }
   }
 );
-
-// Add request timing
-api.interceptors.request.use((config) => {
-  config.metadata = { startTime: Date.now() };
-  return config;
-}, (error) => {
-  return Promise.reject(error);
-});
-
-api.interceptors.response.use((response) => {
-  if (response.config.metadata) {
-    response.config.metadata.endTime = Date.now();
-  }
-  return response;
-}, (error) => {
-  return Promise.reject(error);
-});
 
 export default api;
