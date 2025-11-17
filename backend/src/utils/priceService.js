@@ -1,6 +1,6 @@
 /**
- * Servicio de actualización de precios - Yahoo Finance via RapidAPI
- * Integración con steadyapi (RapidAPI) para obtener precios en tiempo real e históricos
+ * Servicio de actualización de precios - Yahoo Finance v1 via RapidAPI
+ * Integración con yahoo-finance15.p.rapidapi.com para obtener precios en tiempo real e históricos
  */
 
 import axios from 'axios';
@@ -8,8 +8,12 @@ import logger from '../config/logger.js';
 
 // Configuración de RapidAPI
 const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
-const RAPIDAPI_HOST = process.env.RAPIDAPI_HOST || 'yahoo-finance127.p.rapidapi.com';
+const RAPIDAPI_HOST = process.env.RAPIDAPI_HOST || 'yahoo-finance15.p.rapidapi.com';
 const PRICE_UPDATE_MODE = process.env.PRICE_UPDATE_MODE || 'manual';
+
+// Configuración de reintentos
+const MAX_RETRIES = 4;
+const INITIAL_RETRY_DELAY = 2000; // 2 segundos
 
 // Cache simple para evitar exceso de llamadas a la API
 const priceCache = new Map();
@@ -45,12 +49,17 @@ const saveToCache = (key, data) => {
 };
 
 /**
- * Hacer petición a RapidAPI usando axios
+ * Implementar sleep para reintentos con backoff exponencial
  */
-const fetchFromRapidAPI = async (endpoint, symbol) => {
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * Hacer petición a RapidAPI con reintentos y backoff exponencial
+ */
+const fetchFromRapidAPI = async (endpoint, symbol, retryCount = 0) => {
   const url = `https://${RAPIDAPI_HOST}${endpoint}`;
 
-  logger.debug(`Fetching from RapidAPI: ${endpoint} for ${symbol}`);
+  logger.debug(`Fetching from RapidAPI: ${endpoint} for ${symbol} (attempt ${retryCount + 1}/${MAX_RETRIES + 1})`);
 
   try {
     const response = await axios({
@@ -65,13 +74,28 @@ const fetchFromRapidAPI = async (endpoint, symbol) => {
 
     return response.data;
   } catch (error) {
+    const isNetworkError = error.code === 'ECONNABORTED' ||
+                          error.code === 'ETIMEDOUT' ||
+                          error.code === 'ENOTFOUND' ||
+                          error.response?.status >= 500;
+
+    // Reintentar solo si es un error de red/servidor y no hemos excedido los reintentos
+    if (isNetworkError && retryCount < MAX_RETRIES) {
+      const delay = INITIAL_RETRY_DELAY * Math.pow(2, retryCount); // Backoff exponencial: 2s, 4s, 8s, 16s
+      logger.warn(`Network error for ${symbol}, retrying in ${delay}ms... (${retryCount + 1}/${MAX_RETRIES})`);
+
+      await sleep(delay);
+      return fetchFromRapidAPI(endpoint, symbol, retryCount + 1);
+    }
+
+    // Si no es un error de red o ya agotamos los reintentos, lanzar el error
     logger.error(`RapidAPI fetch error for ${symbol}:`, error.response?.data?.message || error.message);
     throw error;
   }
 };
 
 /**
- * Obtener precio actual de un símbolo
+ * Obtener precio actual de un símbolo usando /api/v1/market/quotes
  * @param {string} symbol - Símbolo del activo (ej: 'AAPL', 'BTC-USD', 'MSFT')
  * @param {string} type - Tipo de activo ('stock', 'crypto', 'etf', etc.)
  * @returns {Object|null} - Datos del precio o null
@@ -97,27 +121,43 @@ export const fetchCurrentPrice = async (symbol, type = 'stock') => {
       formattedSymbol = `${formattedSymbol}-USD`;
     }
 
-    // Obtener cotización de RapidAPI
-    const data = await fetchFromRapidAPI(`/quote/${formattedSymbol}`, formattedSymbol);
+    // Obtener cotización usando el endpoint v1/market/quotes (real-time)
+    const endpoint = `/api/v1/market/quotes?ticker=${encodeURIComponent(formattedSymbol)}`;
+    const data = await fetchFromRapidAPI(endpoint, formattedSymbol);
 
-    // Extraer información relevante
-    if (data && data.quoteResponse && data.quoteResponse.result && data.quoteResponse.result.length > 0) {
-      const quote = data.quoteResponse.result[0];
+    // Extraer información relevante de la respuesta
+    // La API puede devolver diferentes estructuras, intentamos manejar varias
+    let quote = null;
 
+    if (data && data.body && Array.isArray(data.body) && data.body.length > 0) {
+      quote = data.body[0];
+    } else if (data && Array.isArray(data) && data.length > 0) {
+      quote = data[0];
+    } else if (data && typeof data === 'object') {
+      quote = data;
+    }
+
+    if (quote) {
       const priceData = {
-        symbol: quote.symbol,
-        price: quote.regularMarketPrice || quote.price,
+        symbol: quote.symbol || formattedSymbol,
+        price: quote.regularMarketPrice || quote.price || quote.currentPrice || quote.lastPrice,
         previousClose: quote.previousClose || quote.regularMarketPreviousClose,
-        change: quote.regularMarketChange,
-        changePercent: quote.regularMarketChangePercent,
-        dayHigh: quote.regularMarketDayHigh,
-        dayLow: quote.regularMarketDayLow,
-        volume: quote.regularMarketVolume,
+        change: quote.regularMarketChange || quote.change,
+        changePercent: quote.regularMarketChangePercent || quote.changePercent,
+        dayHigh: quote.regularMarketDayHigh || quote.dayHigh,
+        dayLow: quote.regularMarketDayLow || quote.dayLow,
+        volume: quote.regularMarketVolume || quote.volume,
         marketCap: quote.marketCap,
         currency: quote.currency || 'USD',
-        timestamp: new Date(quote.regularMarketTime * 1000),
-        displayName: quote.shortName || quote.longName || symbol,
+        timestamp: quote.regularMarketTime ? new Date(quote.regularMarketTime * 1000) : new Date(),
+        displayName: quote.shortName || quote.longName || quote.displayName || symbol,
       };
+
+      // Verificar que tengamos al menos un precio
+      if (!priceData.price) {
+        logger.warn(`No price data found in response for ${symbol}`);
+        return null;
+      }
 
       // Guardar en caché
       saveToCache(cacheKey, priceData);
@@ -137,7 +177,7 @@ export const fetchCurrentPrice = async (symbol, type = 'stock') => {
 };
 
 /**
- * Obtener precios históricos para gráficos
+ * Obtener precios históricos para gráficos usando /api/v2/stock/history
  * @param {string} symbol - Símbolo del activo
  * @param {Date} startDate - Fecha de inicio
  * @param {Date} endDate - Fecha de fin
@@ -159,35 +199,49 @@ export const fetchHistoricalPrices = async (symbol, startDate, endDate, interval
       return cached;
     }
 
-    // Convertir fechas a timestamps Unix
-    const period1 = Math.floor(new Date(startDate).getTime() / 1000);
-    const period2 = Math.floor(new Date(endDate).getTime() / 1000);
+    // Convertir fechas a formato YYYY-MM-DD
+    const formatDate = (date) => {
+      const d = new Date(date);
+      return d.toISOString().split('T')[0];
+    };
 
-    // Obtener datos históricos de RapidAPI
-    const endpoint = `/chart/${symbol}?period1=${period1}&period2=${period2}&interval=${interval}`;
+    const formattedStartDate = formatDate(startDate);
+    const formattedEndDate = formatDate(endDate);
+
+    // Obtener datos históricos usando el endpoint v2/stock/history
+    const endpoint = `/api/v2/stock/history?symbol=${encodeURIComponent(symbol)}&from=${formattedStartDate}&to=${formattedEndDate}`;
     const data = await fetchFromRapidAPI(endpoint, symbol);
 
     // Extraer datos de precios
-    if (data && data.chart && data.chart.result && data.chart.result.length > 0) {
-      const result = data.chart.result[0];
-      const timestamps = result.timestamp || [];
-      const quotes = result.indicators?.quote?.[0] || {};
-      const closes = quotes.close || [];
-      const opens = quotes.open || [];
-      const highs = quotes.high || [];
-      const lows = quotes.low || [];
-      const volumes = quotes.volume || [];
+    let historicalData = [];
 
-      // Mapear a formato usado
-      const historicalData = timestamps.map((timestamp, index) => ({
-        date: new Date(timestamp * 1000),
-        open: opens[index],
-        high: highs[index],
-        low: lows[index],
-        close: closes[index],
-        volume: volumes[index],
-      })).filter(item => item.close !== null); // Filtrar datos nulos
+    // La API puede devolver diferentes estructuras
+    if (data && data.body && data.body.historical && Array.isArray(data.body.historical)) {
+      historicalData = data.body.historical.map(item => ({
+        date: new Date(item.date),
+        open: item.open,
+        high: item.high,
+        low: item.low,
+        close: item.close,
+        volume: item.volume,
+      }));
+    } else if (data && Array.isArray(data)) {
+      historicalData = data.map(item => ({
+        date: new Date(item.date),
+        open: item.open,
+        high: item.high,
+        low: item.low,
+        close: item.close,
+        volume: item.volume,
+      }));
+    }
 
+    // Filtrar datos nulos y ordenar por fecha
+    historicalData = historicalData
+      .filter(item => item.close !== null && !isNaN(item.close))
+      .sort((a, b) => a.date - b.date);
+
+    if (historicalData.length > 0) {
       // Guardar en caché
       saveToCache(cacheKey, historicalData);
 
@@ -282,7 +336,7 @@ export const updateAssetsPrices = async (assets) => {
       }
 
       // Pequeño delay para no saturar la API (rate limiting)
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await sleep(200);
 
     } catch (error) {
       results.failed++;
@@ -324,7 +378,7 @@ export const validateSymbol = async (symbol, type = 'stock') => {
 };
 
 /**
- * Buscar símbolos por nombre o keyword
+ * Buscar símbolos por nombre o keyword usando /api/v1/search
  * @param {string} query - Búsqueda
  * @returns {Array} - Array de resultados
  */
@@ -336,18 +390,29 @@ export const searchSymbols = async (query) => {
   }
 
   try {
-    const data = await fetchFromRapidAPI(`/auto-complete?q=${encodeURIComponent(query)}`, query);
+    const endpoint = `/api/v1/search?query=${encodeURIComponent(query)}`;
+    const data = await fetchFromRapidAPI(endpoint, query);
 
-    if (data && data.ResultSet && data.ResultSet.Result) {
-      return data.ResultSet.Result.map(item => ({
+    let results = [];
+
+    // Manejar diferentes estructuras de respuesta
+    if (data && data.body && Array.isArray(data.body)) {
+      results = data.body.map(item => ({
         symbol: item.symbol,
-        name: item.name,
-        type: item.typeDisp,
-        exchange: item.exchDisp,
+        name: item.name || item.longName || item.shortName,
+        type: item.typeDisp || item.quoteType || item.type,
+        exchange: item.exchDisp || item.exchange,
+      }));
+    } else if (data && Array.isArray(data)) {
+      results = data.map(item => ({
+        symbol: item.symbol,
+        name: item.name || item.longName || item.shortName,
+        type: item.typeDisp || item.quoteType || item.type,
+        exchange: item.exchDisp || item.exchange,
       }));
     }
 
-    return [];
+    return results;
   } catch (error) {
     logger.error(`Symbol search error for "${query}":`, error.message);
     return [];
@@ -363,8 +428,11 @@ export const getPriceServiceInfo = () => {
     mode: PRICE_UPDATE_MODE,
     autoEnabled: isAutoMode(),
     apiConfigured: !!(RAPIDAPI_KEY && RAPIDAPI_KEY !== 'your_rapidapi_key_here'),
+    host: RAPIDAPI_HOST,
     cacheSize: priceCache.size,
     cacheTTL: CACHE_TTL,
+    maxRetries: MAX_RETRIES,
+    initialRetryDelay: INITIAL_RETRY_DELAY,
   };
 };
 
