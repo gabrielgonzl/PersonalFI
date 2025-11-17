@@ -71,6 +71,14 @@ const SettingsSchema = new mongoose.Schema(
       },
     },
 
+    // Benchmark preferido
+    preferredBenchmark: {
+      type: String,
+      uppercase: true,
+      default: 'SPY', // S&P 500 por defecto
+      maxlength: 20,
+    },
+
     // Notificaciones (para futuro)
     notifications: {
       priceAlerts: {
