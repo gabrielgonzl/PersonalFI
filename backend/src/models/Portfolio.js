@@ -14,6 +14,14 @@ const PortfolioSchema = new mongoose.Schema(
       maxlength: [500, 'La descripción no puede exceder 500 caracteres'],
     },
 
+    // Jerarquía de portfolios (portfolios pueden contener otros portfolios)
+    parentPortfolioId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Portfolio',
+      default: null,
+      index: true,
+    },
+
     // Información financiera
     cashBalance: {
       type: Number,

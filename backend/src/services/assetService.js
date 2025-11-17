@@ -10,7 +10,9 @@ import logger from '../config/logger.js';
 class AssetService {
   /**
    * Obtener todos los assets con filtros
-   * Si se filtra por portfolioId, incluye el efectivo del portfolio como un asset virtual
+   * Si se filtra por portfolioId, incluye:
+   * - El efectivo del portfolio como un asset virtual
+   * - Los sub-portfolios (carteras hijas) como assets virtuales
    */
   async getAllAssets(filters = {}) {
     const query = {};
@@ -25,43 +27,81 @@ class AssetService {
       .populate('portfolioId', 'name color')
       .sort({ [sortBy]: order });
 
-    // Si se filtra por portfolio, agregar el efectivo como asset virtual
+    // Si se filtra por portfolio, agregar assets virtuales
     if (filters.portfolioId) {
       const portfolio = await Portfolio.findById(filters.portfolioId);
 
-      if (portfolio && portfolio.cashBalance > 0) {
-        // Crear asset virtual para el efectivo
-        const cashAsset = {
-          _id: `cash_${portfolio._id}`,
-          name: 'Efectivo',
-          symbol: portfolio.currency || 'USD',
-          type: 'cash',
-          currency: portfolio.currency || 'USD',
-          portfolioId: {
-            _id: portfolio._id,
-            name: portfolio.name,
-            color: portfolio.color,
-          },
-          quantity: portfolio.cashBalance,
-          currentPrice: 1,
-          currentValue: portfolio.cashBalance,
-          totalInvested: portfolio.cashBalance,
-          averagePrice: 1,
-          profitLoss: 0,
-          profitLossPercentage: 0,
-          notes: 'Efectivo disponible en el portfolio',
-          color: '#10B981', // Verde para cash
-          isCash: true, // Flag para identificarlo como cash
-          lastPriceUpdate: new Date(),
-          createdAt: portfolio.createdAt,
-          updatedAt: portfolio.updatedAt,
-        };
-
+      if (portfolio) {
         // Convertir assets a plain objects si es necesario
         assets = assets.map(a => a.toObject ? a.toObject() : a);
 
-        // Agregar el cash asset al inicio
-        assets.unshift(cashAsset);
+        // 1. Buscar sub-portfolios (carteras hijas) de este portfolio
+        const subPortfolios = await Portfolio.find({ parentPortfolioId: filters.portfolioId });
+
+        // Agregar cada sub-portfolio como un asset virtual
+        for (const subPortfolio of subPortfolios) {
+          const portfolioAsset = {
+            _id: `portfolio_${subPortfolio._id}`,
+            name: subPortfolio.name,
+            symbol: subPortfolio.name.substring(0, 10).toUpperCase(),
+            type: 'portfolio',
+            currency: subPortfolio.currency || 'USD',
+            portfolioId: {
+              _id: portfolio._id,
+              name: portfolio.name,
+              color: portfolio.color,
+            },
+            // Para un portfolio, quantity = 1 (es una unidad)
+            quantity: 1,
+            currentPrice: subPortfolio.totalValue,
+            currentValue: subPortfolio.totalValue,
+            totalInvested: subPortfolio.totalInvested,
+            averagePrice: subPortfolio.totalValue,
+            profitLoss: subPortfolio.profitLoss,
+            profitLossPercentage: subPortfolio.profitLossPercentage,
+            notes: subPortfolio.description || 'Sub-portfolio',
+            color: subPortfolio.color || '#8B5CF6', // Violeta para portfolios
+            isPortfolio: true, // Flag para identificarlo como portfolio
+            subPortfolioId: subPortfolio._id, // ID real del sub-portfolio
+            lastPriceUpdate: subPortfolio.updatedAt,
+            createdAt: subPortfolio.createdAt,
+            updatedAt: subPortfolio.updatedAt,
+          };
+
+          assets.push(portfolioAsset);
+        }
+
+        // 2. Agregar el efectivo como asset virtual (si existe)
+        if (portfolio.cashBalance > 0) {
+          const cashAsset = {
+            _id: `cash_${portfolio._id}`,
+            name: 'Efectivo',
+            symbol: portfolio.currency || 'USD',
+            type: 'cash',
+            currency: portfolio.currency || 'USD',
+            portfolioId: {
+              _id: portfolio._id,
+              name: portfolio.name,
+              color: portfolio.color,
+            },
+            quantity: portfolio.cashBalance,
+            currentPrice: 1,
+            currentValue: portfolio.cashBalance,
+            totalInvested: portfolio.cashBalance,
+            averagePrice: 1,
+            profitLoss: 0,
+            profitLossPercentage: 0,
+            notes: 'Efectivo disponible en el portfolio',
+            color: '#10B981', // Verde para cash
+            isCash: true, // Flag para identificarlo como cash
+            lastPriceUpdate: new Date(),
+            createdAt: portfolio.createdAt,
+            updatedAt: portfolio.updatedAt,
+          };
+
+          // Agregar el cash asset al inicio
+          assets.unshift(cashAsset);
+        }
       }
     }
 
@@ -70,7 +110,9 @@ class AssetService {
 
   /**
    * Obtener un asset por ID
-   * Maneja assets virtuales de cash con ID formato: cash_${portfolioId}
+   * Maneja assets virtuales:
+   * - cash_{portfolioId} para efectivo
+   * - portfolio_{portfolioId} para sub-portfolios
    */
   async getAssetById(id) {
     // Si el ID es de un asset de cash virtual
@@ -111,6 +153,44 @@ class AssetService {
       };
     }
 
+    // Si el ID es de un sub-portfolio virtual
+    if (typeof id === 'string' && id.startsWith('portfolio_')) {
+      const subPortfolioId = id.replace('portfolio_', '');
+      const subPortfolio = await Portfolio.findById(subPortfolioId).populate('parentPortfolioId', 'name color');
+
+      if (!subPortfolio) {
+        throw new AppError('Sub-portfolio no encontrado', HTTP_STATUS.NOT_FOUND, ERROR_CODES.RESOURCE_NOT_FOUND);
+      }
+
+      // Retornar asset virtual de portfolio
+      return {
+        _id: id,
+        name: subPortfolio.name,
+        symbol: subPortfolio.name.substring(0, 10).toUpperCase(),
+        type: 'portfolio',
+        currency: subPortfolio.currency || 'USD',
+        portfolioId: subPortfolio.parentPortfolioId ? {
+          _id: subPortfolio.parentPortfolioId._id,
+          name: subPortfolio.parentPortfolioId.name,
+          color: subPortfolio.parentPortfolioId.color,
+        } : null,
+        quantity: 1,
+        currentPrice: subPortfolio.totalValue,
+        currentValue: subPortfolio.totalValue,
+        totalInvested: subPortfolio.totalInvested,
+        averagePrice: subPortfolio.totalValue,
+        profitLoss: subPortfolio.profitLoss,
+        profitLossPercentage: subPortfolio.profitLossPercentage,
+        notes: subPortfolio.description || 'Sub-portfolio',
+        color: subPortfolio.color || '#8B5CF6',
+        isPortfolio: true,
+        subPortfolioId: subPortfolio._id,
+        lastPriceUpdate: subPortfolio.updatedAt,
+        createdAt: subPortfolio.createdAt,
+        updatedAt: subPortfolio.updatedAt,
+      };
+    }
+
     // Asset normal
     const asset = await Asset.findById(id).populate('portfolioId', 'name color currency');
 
@@ -143,10 +223,18 @@ class AssetService {
    * Actualizar asset
    */
   async updateAsset(id, updates) {
-    // No permitir actualizar assets de cash virtuales
+    // No permitir actualizar assets virtuales (cash o portfolio)
     if (typeof id === 'string' && id.startsWith('cash_')) {
       throw new AppError(
         'No se pueden actualizar activos de tipo "cash". El efectivo se maneja automáticamente.',
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR
+      );
+    }
+
+    if (typeof id === 'string' && id.startsWith('portfolio_')) {
+      throw new AppError(
+        'No se pueden actualizar activos de tipo "portfolio". Edite el portfolio directamente en /portfolios/:id',
         HTTP_STATUS.BAD_REQUEST,
         ERROR_CODES.VALIDATION_ERROR
       );
@@ -177,10 +265,18 @@ class AssetService {
    * Actualizar precio de un asset
    */
   async updatePrice(id, newPrice) {
-    // No permitir actualizar precio de assets de cash (siempre es 1)
+    // No permitir actualizar precio de assets virtuales
     if (typeof id === 'string' && id.startsWith('cash_')) {
       throw new AppError(
         'No se puede actualizar el precio del efectivo (siempre es 1).',
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR
+      );
+    }
+
+    if (typeof id === 'string' && id.startsWith('portfolio_')) {
+      throw new AppError(
+        'No se puede actualizar el precio de un portfolio. El valor se calcula automáticamente.',
         HTTP_STATUS.BAD_REQUEST,
         ERROR_CODES.VALIDATION_ERROR
       );
@@ -209,10 +305,18 @@ class AssetService {
    * Eliminar asset
    */
   async deleteAsset(id) {
-    // No permitir eliminar assets de cash virtuales
+    // No permitir eliminar assets virtuales
     if (typeof id === 'string' && id.startsWith('cash_')) {
       throw new AppError(
         'No se pueden eliminar activos de tipo "cash". El efectivo es parte del portfolio.',
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR
+      );
+    }
+
+    if (typeof id === 'string' && id.startsWith('portfolio_')) {
+      throw new AppError(
+        'No se pueden eliminar activos de tipo "portfolio". Elimine el portfolio directamente en /portfolios/:id',
         HTTP_STATUS.BAD_REQUEST,
         ERROR_CODES.VALIDATION_ERROR
       );
