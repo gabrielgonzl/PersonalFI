@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { usePortfolio, usePortfolioAllocation, useAddCashToPortfolio, useDeletePortfolio } from '../../hooks/usePortfolios';
 import { useApp } from '../../context/AppContext';
+import { useTranslation } from '../../hooks/useTranslation';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { Input } from '../../components/common/Input';
@@ -20,6 +21,7 @@ import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 export const PortfolioDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { currency, showSuccess, showError } = useApp();
 
   const [showAddCashModal, setShowAddCashModal] = useState(false);
@@ -39,29 +41,29 @@ export const PortfolioDetail = () => {
         id,
         data: { amount: parseFloat(cashAmount) },
       });
-      showSuccess('Cash added successfully');
+      showSuccess(t('notifications.cashAdded'));
       setShowAddCashModal(false);
       setCashAmount('');
     } catch (error) {
-      showError(error.message || 'Failed to add cash');
+      showError(error.message || t('notifications.cashAddFailed'));
     }
   };
 
   const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this portfolio? Assets will not be deleted.')) {
+    if (!confirm(t('confirmations.deletePortfolio'))) {
       return;
     }
 
     try {
       await deletePortfolioMutation.mutateAsync(id);
-      showSuccess('Portfolio deleted successfully');
+      showSuccess(t('notifications.portfolioDeleted'));
       navigate('/portfolios');
     } catch (error) {
-      showError(error.message || 'Failed to delete portfolio');
+      showError(error.message || t('notifications.portfolioDeleteFailed'));
     }
   };
 
-  if (isLoading) return <Loading text="Loading portfolio..." />;
+  if (isLoading) return <Loading text={t('common.loading')} />;
   if (error) return <ErrorMessage error={error} />;
   if (!portfolio) return <ErrorMessage error={{ message: 'Portfolio not found' }} />;
 
@@ -85,13 +87,13 @@ export const PortfolioDetail = () => {
         </div>
         <div className="flex space-x-3">
           <Button variant="outline" leftIcon={<AddIcon />} onClick={() => setShowAddCashModal(true)}>
-            Add Cash
+            {t('portfolios.addCash')}
           </Button>
           <Button variant="outline" leftIcon={<EditIcon />} onClick={() => navigate(`/portfolios/${id}/edit`)}>
-            Edit
+            {t('portfolios.edit')}
           </Button>
           <Button variant="danger" leftIcon={<DeleteIcon />} onClick={handleDelete} loading={deletePortfolioMutation.isLoading}>
-            Delete
+            {t('portfolios.delete')}
           </Button>
         </div>
       </div>
@@ -99,28 +101,28 @@ export const PortfolioDetail = () => {
       {/* Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
-          <p className="text-sm text-gray-600">Total Value</p>
+          <p className="text-sm text-gray-600">{t('portfolios.totalValue')}</p>
           <p className="text-2xl font-bold text-gray-900 mt-2">
             {formatCurrency(portfolioData.totalValue, portfolioData.currency)}
           </p>
         </Card>
 
         <Card>
-          <p className="text-sm text-gray-600">Cash Balance</p>
+          <p className="text-sm text-gray-600">{t('portfolios.cashBalance')}</p>
           <p className="text-2xl font-bold text-gray-900 mt-2">
             {formatCurrency(portfolioData.cashBalance, portfolioData.currency)}
           </p>
         </Card>
 
         <Card>
-          <p className="text-sm text-gray-600">Total Invested</p>
+          <p className="text-sm text-gray-600">{t('portfolios.invested')}</p>
           <p className="text-2xl font-bold text-gray-900 mt-2">
             {formatCurrency(portfolioData.totalInvested, portfolioData.currency)}
           </p>
         </Card>
 
         <Card>
-          <p className="text-sm text-gray-600">Profit/Loss</p>
+          <p className="text-sm text-gray-600">{t('portfolios.profitLoss')}</p>
           <p className={`text-2xl font-bold mt-2 ${getProfitLossColor(portfolioData.profitLoss)}`}>
             {getProfitLossPrefix(portfolioData.profitLoss)}
             {formatCurrency(Math.abs(portfolioData.profitLoss), portfolioData.currency)}
@@ -134,7 +136,7 @@ export const PortfolioDetail = () => {
 
       {/* Allocation Chart */}
       {allocationData.length > 0 && (
-        <Card title="Asset Allocation" subtitle="Distribution by value">
+        <Card title={t('portfolios.assetAllocation')} subtitle={t('portfolios.distributionByValue')}>
           <PieChart
             data={allocationData.map(item => ({
               name: item.assetName,
@@ -151,10 +153,10 @@ export const PortfolioDetail = () => {
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-2xl font-bold text-gray-900">
-            Assets ({assets.length})
+            {t('portfolios.assets')} ({assets.length})
           </h2>
           <Button size="sm" onClick={() => navigate('/assets/create')}>
-            Add Asset to Portfolio
+            {t('portfolios.addAssetToPortfolio')}
           </Button>
         </div>
 
@@ -167,7 +169,7 @@ export const PortfolioDetail = () => {
         ) : (
           <Card>
             <p className="text-gray-500 text-center py-8">
-              No assets in this portfolio yet. Add assets to get started.
+              {t('portfolios.noAssetsYet')}
             </p>
           </Card>
         )}
@@ -177,27 +179,27 @@ export const PortfolioDetail = () => {
       <Modal
         isOpen={showAddCashModal}
         onClose={() => setShowAddCashModal(false)}
-        title="Add Cash to Portfolio"
+        title={t('portfolios.addCash')}
       >
         <div className="space-y-4">
           <p className="text-sm text-gray-600">
-            Current balance: {formatCurrency(portfolioData.cashBalance, portfolioData.currency)}
+            {t('portfolios.cashBalance')}: {formatCurrency(portfolioData.cashBalance, portfolioData.currency)}
           </p>
           <Input
-            label="Amount"
+            label={t('createAsset.symbol')}
             type="number"
             step="any"
             value={cashAmount}
             onChange={(e) => setCashAmount(e.target.value)}
-            placeholder="Enter amount to add"
+            placeholder={t('createAsset.symbolPlaceholder')}
             leftIcon={<AccountBalanceWalletIcon className="w-5 h-5 text-gray-400" />}
           />
           <div className="flex justify-end space-x-3">
             <Button variant="outline" onClick={() => setShowAddCashModal(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleAddCash} loading={addCashMutation.isLoading}>
-              Add Cash
+              {t('portfolios.addCash')}
             </Button>
           </div>
         </div>

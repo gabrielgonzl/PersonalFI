@@ -4,6 +4,7 @@ import { useAsset, useAssetContributions, useAssetPerformance, useUpdateAssetPri
 import { useCreateContribution } from '../../hooks/useContributions';
 import { useAssets } from '../../hooks/useAssets';
 import { useApp } from '../../context/AppContext';
+import { useTranslation } from '../../hooks/useTranslation';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { Input } from '../../components/common/Input';
@@ -23,6 +24,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 export const AssetDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { currency, showSuccess, showError } = useApp();
 
   const [showPriceModal, setShowPriceModal] = useState(false);
@@ -47,41 +49,41 @@ export const AssetDetail = () => {
         id,
         data: { currentPrice: parseFloat(newPrice) },
       });
-      showSuccess('Price updated successfully');
+      showSuccess(t('notifications.priceUpdated'));
       setShowPriceModal(false);
       setNewPrice('');
     } catch (error) {
-      showError(error.message || 'Failed to update price');
+      showError(error.message || t('notifications.priceUpdateFailed'));
     }
   };
 
   const handleAddContribution = async (data) => {
     try {
       await createContributionMutation.mutateAsync(data);
-      showSuccess('Contribution added successfully');
+      showSuccess(t('notifications.contributionAdded'));
       setShowContributionModal(false);
     } catch (error) {
-      showError(error.message || 'Failed to add contribution');
+      showError(error.message || t('notifications.contributionFailed'));
     }
   };
 
   const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this asset? This will also delete all associated contributions.')) {
+    if (!confirm(t('confirmations.deleteAsset'))) {
       return;
     }
 
     try {
       await deleteAssetMutation.mutateAsync(id);
-      showSuccess('Asset deleted successfully');
+      showSuccess(t('notifications.assetDeleted'));
       navigate('/assets');
     } catch (error) {
-      showError(error.message || 'Failed to delete asset');
+      showError(error.message || t('notifications.assetDeleteFailed'));
     }
   };
 
-  if (isLoading) return <Loading text="Loading asset..." />;
+  if (isLoading) return <Loading text={t('common.loading')} />;
   if (error) return <ErrorMessage error={error} />;
-  if (!asset) return <ErrorMessage error={{ message: 'Asset not found' }} />;
+  if (!asset) return <ErrorMessage error={{ message: t('common.errorOccurred') }} />;
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -100,13 +102,13 @@ export const AssetDetail = () => {
         </div>
         <div className="flex space-x-3">
           <Button variant="outline" leftIcon={<RefreshIcon />} onClick={() => setShowPriceModal(true)}>
-            Update Price
+            {t('assets.updatePrice')}
           </Button>
           <Button variant="outline" leftIcon={<EditIcon />} onClick={() => navigate(`/assets/${id}/edit`)}>
-            Edit
+            {t('assets.edit')}
           </Button>
           <Button variant="danger" leftIcon={<DeleteIcon />} onClick={handleDelete} loading={deleteAssetMutation.isLoading}>
-            Delete
+            {t('assets.delete')}
           </Button>
         </div>
       </div>
@@ -114,21 +116,21 @@ export const AssetDetail = () => {
       {/* Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
-          <p className="text-sm text-gray-600">Current Value</p>
+          <p className="text-sm text-gray-600">{t('assets.currentValue')}</p>
           <p className="text-2xl font-bold text-gray-900 mt-2">
             {formatCurrency(asset.data.currentValue, asset.data.currency)}
           </p>
         </Card>
 
         <Card>
-          <p className="text-sm text-gray-600">Total Invested</p>
+          <p className="text-sm text-gray-600">{t('assets.invested')}</p>
           <p className="text-2xl font-bold text-gray-900 mt-2">
             {formatCurrency(asset.data.totalInvested, asset.data.currency)}
           </p>
         </Card>
 
         <Card>
-          <p className="text-sm text-gray-600">Profit/Loss</p>
+          <p className="text-sm text-gray-600">{t('assets.profitLoss')}</p>
           <p className={`text-2xl font-bold mt-2 ${getProfitLossColor(asset.data.profitLoss)}`}>
             {getProfitLossPrefix(asset.data.profitLoss)}
             {formatCurrency(Math.abs(asset.data.profitLoss), asset.data.currency)}
@@ -140,7 +142,7 @@ export const AssetDetail = () => {
         </Card>
 
         <Card>
-          <p className="text-sm text-gray-600">Quantity</p>
+          <p className="text-sm text-gray-600">{t('assets.quantity')}</p>
           <p className="text-2xl font-bold text-gray-900 mt-2">
             {asset.data.quantity?.toFixed(4)}
           </p>
@@ -152,10 +154,10 @@ export const AssetDetail = () => {
 
       {/* Performance Chart */}
       {performance?.data?.length > 0 && (
-        <Card title="Performance" subtitle="Historical value over time">
+        <Card title={t('assets.performance')} subtitle={t('assets.historicalValue')}>
           <LineChart
             data={performance.data}
-            lines={[{ dataKey: 'value', name: 'Value', color: '#0ea5e9' }]}
+            lines={[{ dataKey: 'value', name: t('assets.currentValue'), color: '#0ea5e9' }]}
             currency={asset.data.currency}
             height={300}
           />
@@ -164,11 +166,11 @@ export const AssetDetail = () => {
 
       {/* Contributions */}
       <Card
-        title="Contributions"
-        subtitle={`${contributions.length} total transactions`}
+        title={t('assets.contributions')}
+        subtitle={`${contributions.length} ${t('assets.totalTransactions')}`}
         action={
           <Button size="sm" leftIcon={<AddIcon />} onClick={() => setShowContributionModal(true)}>
-            Add Contribution
+            {t('assets.addContribution')}
           </Button>
         }
       >
@@ -198,7 +200,7 @@ export const AssetDetail = () => {
             ))}
           </div>
         ) : (
-          <p className="text-gray-500 text-center py-8">No contributions yet</p>
+          <p className="text-gray-500 text-center py-8">{t('assets.noContributionsYet')}</p>
         )}
       </Card>
 
@@ -206,26 +208,26 @@ export const AssetDetail = () => {
       <Modal
         isOpen={showPriceModal}
         onClose={() => setShowPriceModal(false)}
-        title="Update Asset Price"
+        title={t('assets.updatePrice')}
       >
         <div className="space-y-4">
           <p className="text-sm text-gray-600">
-            Current price: {formatCurrency(asset.data.currentPrice, asset.data.currency)}
+            {t('assets.currentPrice')}: {formatCurrency(asset.data.currentPrice, asset.data.currency)}
           </p>
           <Input
-            label="New Price"
+            label={t('assets.currentPrice')}
             type="number"
             step="any"
             value={newPrice}
             onChange={(e) => setNewPrice(e.target.value)}
-            placeholder="Enter new price"
+            placeholder={t('assets.currentPrice')}
           />
           <div className="flex justify-end space-x-3">
             <Button variant="outline" onClick={() => setShowPriceModal(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleUpdatePrice} loading={updatePriceMutation.isLoading}>
-              Update
+              {t('common.update')}
             </Button>
           </div>
         </div>
@@ -235,7 +237,7 @@ export const AssetDetail = () => {
       <Modal
         isOpen={showContributionModal}
         onClose={() => setShowContributionModal(false)}
-        title="Add Contribution"
+        title={t('assets.addContribution')}
         size="lg"
       >
         <ContributionForm

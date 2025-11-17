@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { usePerformanceData, useDistributionData, useTopPerformers, useTimelineData } from '../../hooks/useAnalytics';
 import { useApp } from '../../context/AppContext';
+import { useTranslation } from '../../hooks/useTranslation';
 import { Card } from '../../components/common/Card';
 import { Select } from '../../components/common/Input';
 import { Loading } from '../../components/common/Loading';
@@ -12,6 +13,7 @@ import { formatCurrency, formatPercentage, getProfitLossColor, getProfitLossPref
 import { DATE_RANGES, DATE_RANGE_LABELS } from '../../config/constants';
 
 export const Analytics = () => {
+  const { t } = useTranslation();
   const { currency } = useApp();
   const [period, setPeriod] = useState(DATE_RANGES.MONTH);
 
@@ -30,8 +32,8 @@ export const Analytics = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Analytics</h1>
-          <p className="text-gray-600 mt-1">Detailed insights into your investment performance</p>
+          <h1 className="text-3xl font-bold text-gray-900">{t('analytics.title')}</h1>
+          <p className="text-gray-600 mt-1">{t('analytics.subtitle')}</p>
         </div>
         <Select
           value={period}
@@ -42,7 +44,7 @@ export const Analytics = () => {
       </div>
 
       {/* Performance Chart */}
-      <Card title="Portfolio Performance" subtitle={`Value over time - ${DATE_RANGE_LABELS[period]}`}>
+      <Card title={t('analytics.portfolioPerformance')} subtitle={`${t('analytics.valueOverTime')} - ${DATE_RANGE_LABELS[period]}`}>
         {performanceLoading ? (
           <Loading />
         ) : performance?.data?.length > 0 ? (
@@ -56,13 +58,13 @@ export const Analytics = () => {
             height={350}
           />
         ) : (
-          <p className="text-gray-500 text-center py-8">No performance data available</p>
+          <p className="text-gray-500 text-center py-8">{t('analytics.noPerformanceData')}</p>
         )}
       </Card>
 
       {/* Distribution Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card title="Distribution by Asset Type" subtitle="Breakdown by category">
+        <Card title={t('analytics.distributionByType')} subtitle={t('analytics.breakdownByCategory')}>
           {distributionLoading ? (
             <Loading />
           ) : distribution?.byType?.length > 0 ? (
@@ -75,11 +77,11 @@ export const Analytics = () => {
               height={300}
             />
           ) : (
-            <p className="text-gray-500 text-center py-8">No distribution data</p>
+            <p className="text-gray-500 text-center py-8">{t('analytics.noDistributionData')}</p>
           )}
         </Card>
 
-        <Card title="Distribution by Portfolio" subtitle="Allocation across portfolios">
+        <Card title={t('analytics.distributionByPortfolio')} subtitle={t('analytics.allocationAcrossPortfolios')}>
           {distributionLoading ? (
             <Loading />
           ) : distribution?.byPortfolio?.length > 0 ? (
@@ -93,20 +95,20 @@ export const Analytics = () => {
               height={300}
             />
           ) : (
-            <p className="text-gray-500 text-center py-8">No portfolio data</p>
+            <p className="text-gray-500 text-center py-8">{t('analytics.noPortfolioData')}</p>
           )}
         </Card>
       </div>
 
       {/* Top Performers */}
-      <Card title="Top Performers" subtitle="Best and worst performing assets">
+      <Card title={t('analytics.topPerformers')} subtitle={t('analytics.bestWorstPerformingAssets')}>
         {topPerformersLoading ? (
           <Loading />
         ) : topPerformers?.data?.length > 0 ? (
           <div className="space-y-4">
             {/* Top Gainers */}
             <div>
-              <h3 className="text-lg font-semibold text-success-700 mb-3">Top Gainers</h3>
+              <h3 className="text-lg font-semibold text-success-700 mb-3">{t('analytics.topGainers')}</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {topPerformers.data
                   .filter(asset => asset.profitLossPercentage > 0)
@@ -134,7 +136,7 @@ export const Analytics = () => {
             {/* Top Losers */}
             {topPerformers.data.some(asset => asset.profitLossPercentage < 0) && (
               <div>
-                <h3 className="text-lg font-semibold text-danger-700 mb-3">Top Losers</h3>
+                <h3 className="text-lg font-semibold text-danger-700 mb-3">{t('analytics.topLosers')}</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {topPerformers.data
                     .filter(asset => asset.profitLossPercentage < 0)
@@ -160,26 +162,26 @@ export const Analytics = () => {
             )}
           </div>
         ) : (
-          <p className="text-gray-500 text-center py-8">No performance data available</p>
+          <p className="text-gray-500 text-center py-8">{t('analytics.noPerformanceData')}</p>
         )}
       </Card>
 
       {/* Investment Timeline */}
-      <Card title="Investment Timeline" subtitle="Contribution history over time">
+      <Card title={t('analytics.investmentTimeline')} subtitle={t('analytics.contributionHistory')}>
         {timelineLoading ? (
           <Loading />
         ) : timeline?.data?.length > 0 ? (
           <BarChart
             data={timeline.data}
             bars={[
-              { dataKey: 'totalBuy', name: 'Purchases', color: '#22c55e' },
-              { dataKey: 'totalSell', name: 'Sales', color: '#ef4444' },
+              { dataKey: 'totalBuy', name: t('analytics.purchases'), color: '#22c55e' },
+              { dataKey: 'totalSell', name: t('analytics.sales'), color: '#ef4444' },
             ]}
             currency={currency}
             height={300}
           />
         ) : (
-          <p className="text-gray-500 text-center py-8">No timeline data available</p>
+          <p className="text-gray-500 text-center py-8">{t('analytics.noTimelineData')}</p>
         )}
       </Card>
     </div>
