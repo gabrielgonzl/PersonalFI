@@ -1,16 +1,21 @@
 /**
  * Servicio de analytics y métricas financieras
+ * ACTUALIZADO: Ahora usa precios históricos reales
  */
 
-import { Asset, Portfolio, Contribution } from '../models/index.js';
+import { Asset, Portfolio, Contribution, PriceHistory } from '../models/index.js';
 import {
   calculateSimpleReturn,
   calculatePerformanceMetrics,
   calculateTimeline,
   calculateAllocation,
+  calculateRiskMetrics,
+  calculateHHI,
 } from '../utils/calculations.js';
 import { TIME_PERIODS } from '../config/constants.js';
 import { subDays, subMonths, subYears } from 'date-fns';
+import priceHistoryService from './priceHistoryService.js';
+import benchmarkService from './benchmarkService.js';
 
 class AnalyticsService {
   /**
@@ -61,6 +66,7 @@ class AnalyticsService {
 
   /**
    * Obtener rendimiento histórico
+   * CORREGIDO: Ahora usa precios históricos reales en lugar del precio actual
    */
   async getPerformance(period = 'all', granularity = 'day') {
     // Calcular fecha de inicio según período
@@ -84,87 +90,174 @@ class AnalyticsService {
         startDate = subYears(endDate, 1);
         break;
       default:
-        startDate = null; // All time
+        // All time: buscar primera contribución
+        const firstContribution = await Contribution.findOne().sort({ date: 1 });
+        startDate = firstContribution ? firstContribution.date : subYears(endDate, 5);
         break;
     }
 
     // Obtener todas las contribuciones en el período
-    const query = {};
-    if (startDate) {
-      query.date = { $gte: startDate, $lte: endDate };
-    }
-    const contributions = await Contribution.find(query).sort({ date: 1 });
+    const contributions = await Contribution.find({
+      date: { $gte: startDate, $lte: endDate },
+    }).sort({ date: 1 });
 
-    // Obtener assets actuales para calcular valores
+    // Obtener todos los assets
     const assets = await Asset.find();
-    const currentTotalValue = assets.reduce((sum, a) => sum + a.currentValue, 0);
-    const currentTotalInvested = assets.reduce((sum, a) => sum + a.totalInvested, 0);
 
-    // Crear timeline agregado
+    // NUEVO: Asegurar que existan precios históricos para todos los assets
+    for (const asset of assets) {
+      const priceCount = await PriceHistory.countDocuments({ assetId: asset._id });
+      if (priceCount === 0) {
+        console.log(`Generating price history for asset ${asset.name}...`);
+        await priceHistoryService.generateSyntheticPriceHistory(asset._id);
+      }
+    }
+
+    // Crear timeline día por día
     const timeline = [];
-    let cumulativeInvested = 0;
     const assetQuantities = {};
+    let cumulativeInvested = 0;
 
-    contributions.forEach((contrib) => {
-      const assetIdStr = contrib.assetId.toString();
+    // Inicializar cantidades de assets
+    assets.forEach((asset) => {
+      assetQuantities[asset._id.toString()] = 0;
+    });
 
-      if (!assetQuantities[assetIdStr]) {
-        assetQuantities[assetIdStr] = { quantity: 0, asset: null };
-      }
+    // Procesar día por día
+    const currentDate = new Date(startDate);
+    let contributionIndex = 0;
 
-      if (contrib.type === 'buy') {
-        cumulativeInvested += contrib.totalAmount;
-        assetQuantities[assetIdStr].quantity += contrib.quantity;
-      } else if (contrib.type === 'sell') {
-        cumulativeInvested -= contrib.totalAmount;
-        assetQuantities[assetIdStr].quantity -= contrib.quantity;
-      }
+    while (currentDate <= endDate) {
+      // Procesar contribuciones de este día
+      while (
+        contributionIndex < contributions.length &&
+        new Date(contributions[contributionIndex].date) <= currentDate
+      ) {
+        const contrib = contributions[contributionIndex];
+        const assetIdStr = contrib.assetId.toString();
 
-      // Calcular valor en ese momento (usando precio histórico)
-      let totalValue = 0;
-      Object.keys(assetQuantities).forEach((aid) => {
-        const asset = assets.find((a) => a._id.toString() === aid);
-        if (asset) {
-          // En producción real, usaríamos precio histórico
-          // Por ahora, usamos precio actual como aproximación
-          totalValue += assetQuantities[aid].quantity * asset.currentPrice;
+        if (contrib.type === 'buy') {
+          cumulativeInvested += contrib.totalAmount + (contrib.fees || 0);
+          assetQuantities[assetIdStr] = (assetQuantities[assetIdStr] || 0) + contrib.quantity;
+        } else if (contrib.type === 'sell') {
+          cumulativeInvested -= contrib.totalAmount - (contrib.fees || 0);
+          assetQuantities[assetIdStr] = (assetQuantities[assetIdStr] || 0) - contrib.quantity;
         }
-      });
 
-      timeline.push({
-        date: contrib.date,
-        totalInvested: cumulativeInvested,
-        totalValue,
-        profitLoss: totalValue - cumulativeInvested,
-        profitLossPercentage: cumulativeInvested > 0 ? ((totalValue - cumulativeInvested) / cumulativeInvested) * 100 : 0,
-      });
-    });
+        contributionIndex++;
+      }
 
-    // Agregar punto actual
-    timeline.push({
-      date: endDate,
-      totalInvested: currentTotalInvested,
-      totalValue: currentTotalValue,
-      profitLoss: currentTotalValue - currentTotalInvested,
-      profitLossPercentage:
-        currentTotalInvested > 0 ? ((currentTotalValue - currentTotalInvested) / currentTotalInvested) * 100 : 0,
-    });
+      // NUEVO: Calcular valor total usando precios históricos REALES
+      let totalValue = 0;
 
-    // Calcular ROI del período
-    const startValue = timeline.length > 1 ? timeline[0].totalInvested : 0;
-    const roi = startValue > 0 ? ((currentTotalValue - startValue) / startValue) * 100 : 0;
+      for (const asset of assets) {
+        const assetIdStr = asset._id.toString();
+        const quantity = assetQuantities[assetIdStr] || 0;
+
+        if (quantity > 0) {
+          // Obtener precio histórico para esta fecha
+          const price = await PriceHistory.getPriceAtDate(asset._id, currentDate);
+
+          if (price) {
+            totalValue += quantity * price;
+          } else {
+            // Fallback al precio actual si no hay histórico
+            totalValue += quantity * asset.currentPrice;
+          }
+        }
+      }
+
+      // Solo agregar al timeline si hay datos relevantes
+      if (cumulativeInvested > 0 || totalValue > 0) {
+        timeline.push({
+          date: new Date(currentDate),
+          totalInvested: Number(cumulativeInvested.toFixed(2)),
+          totalValue: Number(totalValue.toFixed(2)),
+          profitLoss: Number((totalValue - cumulativeInvested).toFixed(2)),
+          profitLossPercentage:
+            cumulativeInvested > 0
+              ? Number((((totalValue - cumulativeInvested) / cumulativeInvested) * 100).toFixed(2))
+              : 0,
+        });
+      }
+
+      // Avanzar al siguiente día
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    // Aplicar granularidad si no es 'day'
+    let processedTimeline = timeline;
+    if (granularity !== 'day' && timeline.length > 0) {
+      processedTimeline = this.aggregateTimelineByGranularity(timeline, granularity);
+    }
+
+    // Calcular métricas del período
+    const startValue = processedTimeline.length > 0 ? processedTimeline[0].totalInvested : 0;
+    const endValue = processedTimeline.length > 0 ? processedTimeline[processedTimeline.length - 1].totalValue : 0;
+    const totalReturn = startValue > 0 ? ((endValue - startValue) / startValue) * 100 : 0;
 
     return {
       period,
       granularity,
-      timeline,
+      timeline: processedTimeline,
       summary: {
-        startValue,
-        endValue: currentTotalValue,
-        roi,
-        totalInvestedInPeriod: cumulativeInvested,
+        startValue: Number(startValue.toFixed(2)),
+        endValue: Number(endValue.toFixed(2)),
+        totalReturn: Number(totalReturn.toFixed(2)),
+        totalInvestedInPeriod: Number(cumulativeInvested.toFixed(2)),
       },
     };
+  }
+
+  /**
+   * Agregar timeline por granularidad (semana, mes, año)
+   */
+  aggregateTimelineByGranularity(timeline, granularity) {
+    if (granularity === 'day') return timeline;
+
+    const aggregated = [];
+    let currentPeriod = null;
+    let periodData = null;
+
+    timeline.forEach((point) => {
+      const date = new Date(point.date);
+      let periodKey;
+
+      switch (granularity) {
+        case 'week':
+          // Usar el inicio de la semana como key
+          const weekStart = new Date(date);
+          weekStart.setDate(date.getDate() - date.getDay());
+          periodKey = weekStart.toISOString().split('T')[0];
+          break;
+        case 'month':
+          periodKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+          break;
+        case 'year':
+          periodKey = `${date.getFullYear()}`;
+          break;
+        default:
+          periodKey = date.toISOString().split('T')[0];
+      }
+
+      if (currentPeriod !== periodKey) {
+        if (periodData) {
+          aggregated.push(periodData);
+        }
+        currentPeriod = periodKey;
+        periodData = { ...point };
+      } else {
+        // Actualizar con el último valor del período
+        periodData = { ...point };
+      }
+    });
+
+    // Agregar último período
+    if (periodData) {
+      aggregated.push(periodData);
+    }
+
+    return aggregated;
   }
 
   /**
@@ -318,6 +411,181 @@ class AnalyticsService {
     const allEvents = [...events, ...assetEvents].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, limit);
 
     return { events: allEvents };
+  }
+
+  /**
+   * NUEVO: Obtener métricas de riesgo del portfolio
+   */
+  async getRiskMetrics(period = '1y') {
+    const endDate = new Date();
+    let startDate;
+
+    switch (period) {
+      case '1m':
+        startDate = subMonths(endDate, 1);
+        break;
+      case '3m':
+        startDate = subMonths(endDate, 3);
+        break;
+      case '6m':
+        startDate = subMonths(endDate, 6);
+        break;
+      case '1y':
+        startDate = subYears(endDate, 1);
+        break;
+      case '3y':
+        startDate = subYears(endDate, 3);
+        break;
+      default:
+        startDate = subYears(endDate, 1);
+    }
+
+    // Obtener performance histórica
+    const performanceData = await this.getPerformance(period, 'day');
+
+    if (!performanceData.timeline || performanceData.timeline.length < 2) {
+      return {
+        volatility: 0,
+        maxDrawdown: { maxDrawdownPercentage: 0 },
+        var95: { var: 0 },
+        var99: { var: 0 },
+        sharpeRatio: 0,
+        sortinoRatio: 0,
+        calmarRatio: 0,
+      };
+    }
+
+    // Calcular retornos diarios
+    const returns = [];
+    const valueHistory = performanceData.timeline.map((p) => ({
+      date: p.date,
+      value: p.totalValue,
+    }));
+
+    for (let i = 1; i < performanceData.timeline.length; i++) {
+      const prev = performanceData.timeline[i - 1].totalValue;
+      const current = performanceData.timeline[i].totalValue;
+      if (prev > 0) {
+        returns.push((current - prev) / prev);
+      }
+    }
+
+    // Calcular métricas de riesgo
+    const riskMetrics = calculateRiskMetrics(valueHistory, returns, 3);
+
+    // Calcular diversificación
+    const assets = await Asset.find();
+    const diversification = calculateHHI(assets);
+
+    return {
+      ...riskMetrics,
+      diversification,
+      period,
+    };
+  }
+
+  /**
+   * NUEVO: Comparar portfolio con benchmark
+   */
+  async compareWithBenchmark(benchmarkSymbol, period = '1y') {
+    const endDate = new Date();
+    let startDate;
+
+    switch (period) {
+      case '1m':
+        startDate = subMonths(endDate, 1);
+        break;
+      case '3m':
+        startDate = subMonths(endDate, 3);
+        break;
+      case '6m':
+        startDate = subMonths(endDate, 6);
+        break;
+      case '1y':
+        startDate = subYears(endDate, 1);
+        break;
+      case '3y':
+        startDate = subYears(endDate, 3);
+        break;
+      default:
+        startDate = subYears(endDate, 1);
+    }
+
+    // Obtener performance del portfolio
+    const performanceData = await this.getPerformance(period, 'day');
+
+    if (!performanceData.timeline || performanceData.timeline.length < 2) {
+      return {
+        benchmark: benchmarkSymbol,
+        comparison: null,
+        message: 'Insufficient portfolio data',
+      };
+    }
+
+    // Calcular retornos del portfolio
+    const portfolioReturns = [];
+    for (let i = 1; i < performanceData.timeline.length; i++) {
+      const prev = performanceData.timeline[i - 1].totalValue;
+      const current = performanceData.timeline[i].totalValue;
+      if (prev > 0) {
+        portfolioReturns.push((current - prev) / prev);
+      }
+    }
+
+    // Comparar con benchmark
+    const benchmarkMetrics = await benchmarkService.calculateBenchmarkMetrics(
+      portfolioReturns,
+      benchmarkSymbol,
+      startDate,
+      endDate
+    );
+
+    // Obtener datos de precios del benchmark para el gráfico
+    const benchmarkData = await benchmarkService.compareWithBenchmark(benchmarkSymbol, startDate, endDate);
+
+    // Normalizar datos para comparación en gráfico (base 100)
+    const portfolioNormalized = this.normalizeToBase100(performanceData.timeline);
+    const benchmarkNormalized = this.normalizeToBase100(benchmarkData.data);
+
+    return {
+      benchmark: benchmarkData.benchmark,
+      symbol: benchmarkSymbol,
+      metrics: benchmarkMetrics,
+      chartData: {
+        portfolio: portfolioNormalized,
+        benchmark: benchmarkNormalized,
+      },
+      period,
+    };
+  }
+
+  /**
+   * Normalizar serie de tiempo a base 100
+   */
+  normalizeToBase100(data) {
+    if (!data || data.length === 0) return [];
+
+    const firstValue = data[0].value || data[0].totalValue || 100;
+
+    return data.map((point) => ({
+      date: point.date,
+      value: ((point.value || point.totalValue) / firstValue) * 100,
+    }));
+  }
+
+  /**
+   * NUEVO: Obtener benchmark recomendado
+   */
+  async getRecommendedBenchmark() {
+    const assets = await Asset.find();
+    return benchmarkService.getRecommendedBenchmark(assets);
+  }
+
+  /**
+   * NUEVO: Obtener todos los benchmarks disponibles
+   */
+  async getAvailableBenchmarks() {
+    return benchmarkService.getActiveBenchmarks();
   }
 }
 

@@ -39,3 +39,29 @@ export const getTopPerformers = async (params = {}) => {
   const url = queryString ? `/analytics/top-performers?${queryString}` : '/analytics/top-performers';
   return api.get(url);
 };
+
+// NUEVO: Get risk metrics
+export const getRiskMetrics = async (params = {}) => {
+  const queryString = new URLSearchParams(params).toString();
+  const url = queryString ? `/analytics/risk-metrics?${queryString}` : '/analytics/risk-metrics';
+  return api.get(url);
+};
+
+// NUEVO: Get available benchmarks
+export const getAvailableBenchmarks = async () => {
+  return api.get('/analytics/benchmarks');
+};
+
+// NUEVO: Get recommended benchmark
+export const getRecommendedBenchmark = async () => {
+  return api.get('/analytics/recommended-benchmark');
+};
+
+// NUEVO: Compare with benchmark
+export const compareWithBenchmark = async (symbol, params = {}) => {
+  const queryString = new URLSearchParams(params).toString();
+  const url = queryString
+    ? `/analytics/benchmark/${symbol}?${queryString}`
+    : `/analytics/benchmark/${symbol}`;
+  return api.get(url);
+};
