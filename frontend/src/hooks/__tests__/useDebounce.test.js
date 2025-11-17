@@ -1,14 +1,15 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { useDebounce } from '../useDebounce';
 
 describe('useDebounce', () => {
   beforeEach(() => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
   });
 
   afterEach(() => {
-    jest.runOnlyPendingTimers();
-    jest.useRealTimers();
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
   });
 
   it('should return initial value immediately', () => {
@@ -30,7 +31,7 @@ describe('useDebounce', () => {
     expect(result.current).toBe('initial');
 
     // Fast-forward time
-    jest.advanceTimersByTime(500);
+    vi.advanceTimersByTime(500);
 
     // Now value should be updated
     await waitFor(() => {
@@ -44,16 +45,16 @@ describe('useDebounce', () => {
     });
 
     rerender({ value: 'second' });
-    jest.advanceTimersByTime(250);
+    vi.advanceTimersByTime(250);
 
     rerender({ value: 'third' });
-    jest.advanceTimersByTime(250);
+    vi.advanceTimersByTime(250);
 
     // After 500ms total, value should still be 'first'
     expect(result.current).toBe('first');
 
     // After another 250ms (750ms total), value should be 'third'
-    jest.advanceTimersByTime(250);
+    vi.advanceTimersByTime(250);
 
     await waitFor(() => {
       expect(result.current).toBe('third');
@@ -67,10 +68,10 @@ describe('useDebounce', () => {
 
     rerender({ value: 'changed' });
 
-    jest.advanceTimersByTime(500);
+    vi.advanceTimersByTime(500);
     expect(result.current).toBe('initial');
 
-    jest.advanceTimersByTime(500);
+    vi.advanceTimersByTime(500);
 
     await waitFor(() => {
       expect(result.current).toBe('changed');
