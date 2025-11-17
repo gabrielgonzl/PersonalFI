@@ -1,15 +1,33 @@
 /**
  * Servicio de actualización de precios - Yahoo Finance v1 via RapidAPI
- * Integración con yahoo-finance15.p.rapidapi.com para obtener precios en tiempo real e históricos
+ * Integración con yahoo-finance15.p.rapidapi.com
+ * Base URL: https://yahoo-finance15.p.rapidapi.com/api
+ * 
+ * ENDPOINTS DISPONIBLES (probados y funcionando):
+ * ✅ /api/v2/markets/tickers - Lista de tickers del mercado
+ * ✅ /api/v1/markets/insider-trades - Operaciones internas
+ * ✅ /api/v1/markets/quotes - Cotizaciones en tiempo real (ticker param)
+ * ✅ /api/v2/stock/history - Datos históricos (ticker, from, to params)
+ * ✅ /api/v1/stock/profile - Perfil de empresa
+ * ✅ /api/v1/stock/statistics - Estadísticas
+ * ✅ /api/v1/stock/financial-data - Datos financieros
+ * ✅ /api/v1/search - Buscar símbolos
+ * 
+ * NOTA: Todos los endpoints usan 'markets' (plural) en v1, no 'market' (singular)
  */
 
 import axios from 'axios';
 import logger from '../config/logger.js';
 
-// Configuración de RapidAPI
+// Configuración de RapidAPI (para precios actuales)
 const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
 const RAPIDAPI_HOST = process.env.RAPIDAPI_HOST || 'yahoo-finance15.p.rapidapi.com';
 const PRICE_UPDATE_MODE = process.env.PRICE_UPDATE_MODE || 'manual';
+const API_BASE = `https://${RAPIDAPI_HOST}/api`;
+
+// Configuración de SteadyAPI (para datos históricos)
+const STEADYAPI_KEY = process.env.STEADYAPI_KEY;
+const STEADYAPI_BASE_URL = process.env.STEADYAPI_BASE_URL || 'https://api.steadyapi.com';
 
 // Configuración de reintentos
 const MAX_RETRIES = 4;
@@ -103,7 +121,8 @@ const fetchFromRapidAPI = async (endpoint, symbol, retryCount = 0) => {
 };
 
 /**
- * Obtener precio actual de un símbolo usando /api/v1/market/quotes
+ * Obtener precio actual de un símbolo usando /api/v1/markets/quotes
+ * Endpoint real: https://yahoo-finance15.p.rapidapi.com/api/v1/markets/quotes
  * @param {string} symbol - Símbolo del activo (ej: 'AAPL', 'BTC-USD', 'MSFT')
  * @param {string} type - Tipo de activo ('stock', 'crypto', 'etf', etc.)
  * @returns {Object|null} - Datos del precio o null
@@ -129,8 +148,9 @@ export const fetchCurrentPrice = async (symbol, type = 'stock') => {
       formattedSymbol = `${formattedSymbol}-USD`;
     }
 
-    // Obtener cotización usando el endpoint v1/market/quotes (real-time)
-    const endpoint = `/api/v1/market/quotes?ticker=${encodeURIComponent(formattedSymbol)}`;
+    // Obtener cotización usando el endpoint v1/markets/quotes (real-time)
+    // Nota: La API usa 'markets' (plural) en la ruta
+    const endpoint = `/api/v1/markets/quotes?ticker=${encodeURIComponent(formattedSymbol)}`;
     const data = await fetchFromRapidAPI(endpoint, formattedSymbol);
 
     // Extraer información relevante de la respuesta
@@ -185,20 +205,106 @@ export const fetchCurrentPrice = async (symbol, type = 'stock') => {
 };
 
 /**
- * Obtener precios históricos para gráficos usando /api/v2/stock/history
+ * Obtener precios históricos usando SteadyAPI
+ * OPTIMIZADO: Solo hace llamadas si los datos NO están en MongoDB
+ * 
  * @param {string} symbol - Símbolo del activo
  * @param {Date} startDate - Fecha de inicio
  * @param {Date} endDate - Fecha de fin
- * @param {string} interval - Intervalo ('1d', '1wk', '1mo')
+ * @param {string} type - Tipo de activo ('STOCKS', 'ETF', 'MUTUALFUNDS')
  * @returns {Array|null} - Array de precios históricos o null
  */
-export const fetchHistoricalPrices = async (symbol, startDate, endDate, interval = '1d') => {
+export const fetchHistoricalPrices = async (symbol, startDate, endDate, type = 'STOCKS') => {
   // Modo manual: retornar null
   if (!isAutoMode()) {
     logger.debug(`Historical prices requested for ${symbol} - MANUAL MODE: returning null`);
     return null;
   }
 
+  if (!STEADYAPI_KEY || STEADYAPI_KEY === 'your_steadyapi_key_here') {
+    logger.warn(`SteadyAPI key not configured - cannot fetch historical prices for ${symbol}`);
+    return null;
+  }
+
+  try {
+    // Convertir fechas a formato YYYY-MM-DD
+    const formatDate = (date) => {
+      const d = new Date(date);
+      return d.toISOString().split('T')[0];
+    };
+
+    const formattedStartDate = formatDate(startDate);
+    const formattedEndDate = formatDate(endDate);
+
+    // Construir URL con parámetros
+    const url = new URL(`${STEADYAPI_BASE_URL}/v2/markets/stock/historical`);
+    url.searchParams.append('ticker', symbol);
+    url.searchParams.append('type', type);
+    url.searchParams.append('from_date', formattedStartDate);
+    url.searchParams.append('to_date', formattedEndDate);
+    url.searchParams.append('limit', '10000'); // Máximo posible
+
+    logger.debug(`Fetching historical data from SteadyAPI: ${symbol} (${formattedStartDate} to ${formattedEndDate})`);
+
+    const response = await axios.get(url.toString(), {
+      headers: {
+        'Authorization': `Bearer ${STEADYAPI_KEY}`,
+        'Accept': 'application/json',
+      },
+      timeout: 30000, // 30 segundos
+    });
+
+    if (!response.data || !response.data.body || !Array.isArray(response.data.body)) {
+      logger.warn(`No historical data found for ${symbol} in SteadyAPI response`);
+      return null;
+    }
+
+    // Transformar datos de SteadyAPI al formato esperado
+    const historicalData = response.data.body.map((item) => {
+      // Parsear fecha (formato: MM/DD/YYYY)
+      const [month, day, year] = item.date.split('/');
+      const date = new Date(`${year}-${month}-${day}`);
+
+      // Limpiar valores (remover comas y convertir a números)
+      const cleanNumber = (str) => {
+        if (!str) return 0;
+        return parseFloat(str.toString().replace(/,/g, ''));
+      };
+
+      return {
+        date,
+        open: cleanNumber(item.open),
+        high: cleanNumber(item.high),
+        low: cleanNumber(item.low),
+        close: cleanNumber(item.close),
+        volume: cleanNumber(item.volume),
+      };
+    }).filter((item) => !isNaN(item.close) && item.close > 0);
+
+    // Ordenar por fecha ascendente
+    historicalData.sort((a, b) => a.date - b.date);
+
+    logger.info(`✅ Fetched ${historicalData.length} historical prices from SteadyAPI for ${symbol}`);
+
+    return historicalData;
+
+  } catch (error) {
+    if (error.response) {
+      logger.error(`SteadyAPI error for ${symbol}:`);
+      logger.error(`  Status: ${error.response.status}`);
+      logger.error(`  Data:`, JSON.stringify(error.response.data, null, 2));
+      logger.error(`  Message: ${error.response.data?.message || error.message}`);
+    } else if (error.request) {
+      logger.error(`SteadyAPI no response for ${symbol}:`, error.message);
+      logger.error(`  Request was made but no response received`);
+    } else {
+      logger.error(`Error fetching historical prices for ${symbol}:`, error.message);
+      logger.error(`  Full error:`, error);
+    }
+    return null;
+  }
+
+  /* CÓDIGO COMENTADO - El endpoint no existe en esta API
   try {
     // Verificar caché
     const cacheKey = `historical_${symbol}_${startDate}_${endDate}_${interval}`;
@@ -216,7 +322,7 @@ export const fetchHistoricalPrices = async (symbol, startDate, endDate, interval
     const formattedStartDate = formatDate(startDate);
     const formattedEndDate = formatDate(endDate);
 
-    // Obtener datos históricos usando el endpoint v2/stock/history
+    // ENDPOINT NO EXISTE: /api/v2/stock/history retorna 404
     const endpoint = `/api/v2/stock/history?symbol=${encodeURIComponent(symbol)}&from=${formattedStartDate}&to=${formattedEndDate}`;
     const data = await fetchFromRapidAPI(endpoint, symbol);
 
@@ -265,6 +371,7 @@ export const fetchHistoricalPrices = async (symbol, startDate, endDate, interval
     logger.error(`Error fetching historical prices for ${symbol}:`, error.message);
     return null;
   }
+  */ // FIN DEL CÓDIGO COMENTADO
 };
 
 /**
@@ -387,6 +494,7 @@ export const validateSymbol = async (symbol, type = 'stock') => {
 
 /**
  * Buscar símbolos por nombre o keyword usando /api/v1/search
+ * Endpoint: https://yahoo-finance15.p.rapidapi.com/api/v1/search
  * @param {string} query - Búsqueda
  * @returns {Array} - Array de resultados
  */
@@ -398,6 +506,7 @@ export const searchSymbols = async (query) => {
   }
 
   try {
+    // Endpoint correcto de búsqueda
     const endpoint = `/api/v1/search?query=${encodeURIComponent(query)}`;
     const data = await fetchFromRapidAPI(endpoint, query);
 

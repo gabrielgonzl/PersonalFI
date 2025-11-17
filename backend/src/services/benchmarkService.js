@@ -154,7 +154,13 @@ class BenchmarkService {
   }
 
   /**
-   * Generar precios para benchmark (intenta RapidAPI primero, luego sintéticos)
+   * Generar precios para benchmark - OPTIMIZADO para minimizar llamadas a API
+   * 
+   * ESTRATEGIA:
+   * 1. Verificar si ya existen datos históricos en MongoDB
+   * 2. Solo llamar a SteadyAPI si NO hay datos o están incompletos
+   * 3. Guardar datos obtenidos en MongoDB para reutilizarlos
+   * 4. Fallback a datos sintéticos solo si la API falla
    */
   async generateSyntheticBenchmarkPrices(benchmarkId, startDate, endDate) {
     const benchmark = await Benchmark.findById(benchmarkId);
@@ -162,41 +168,84 @@ class BenchmarkService {
       throw new Error('Benchmark not found');
     }
 
-    // PRIMERO: Intentar obtener datos reales de RapidAPI
-    const priceService = await import('../utils/priceService.js');
-    console.log(`   Intentando obtener datos reales de Yahoo Finance para ${benchmark.symbol}...`);
+    // ========== PASO 1: VERIFICAR SI YA TENEMOS DATOS EN MONGODB ==========
+    const existingPricesCount = await PriceHistory.countDocuments({
+      assetId: benchmarkId,
+      date: { $gte: startDate, $lte: endDate },
+      source: { $in: ['steadyapi', 'yahoo_finance', 'api'] }, // Solo datos reales
+    });
 
-    const apiPrices = await priceService.default.fetchHistoricalPrices(
-      benchmark.symbol,
-      new Date(startDate),
-      new Date(endDate)
-    );
+    const startBenchmark = new Date(startDate);
+    const endBenchmark = new Date(endDate);
+    const expectedDays = Math.ceil((endBenchmark - startBenchmark) / (1000 * 60 * 60 * 24));
+    const coveragePercentage = (existingPricesCount / expectedDays) * 100;
 
-    if (apiPrices && apiPrices.length > 0) {
-      // Convertir formato API a formato de base de datos
-      const prices = apiPrices.map((price) => ({
+    if (coveragePercentage > 80) {
+      console.log(`   ✅ Ya existen ${existingPricesCount} precios REALES en MongoDB para ${benchmark.symbol}`);
+      console.log(`   ⏭️  Saltando llamada a API (${coveragePercentage.toFixed(0)}% cobertura)`);
+      
+      // Retornar datos existentes
+      const existingPrices = await PriceHistory.find({
         assetId: benchmarkId,
-        date: price.date,
-        open: price.open,
-        high: price.high,
-        low: price.low,
-        close: price.close,
-        volume: price.volume || 0,
-        source: 'yahoo_finance',
-        currency: benchmark.currency,
+        date: { $gte: startDate, $lte: endDate },
+      }).sort({ date: 1 });
+
+      return existingPrices.map((p) => ({
+        assetId: p.assetId,
+        date: p.date,
+        open: p.open,
+        high: p.high,
+        low: p.low,
+        close: p.close,
+        volume: p.volume,
+        source: p.source,
+        currency: p.currency,
       }));
-
-      console.log(`   ✓ Obtenidos ${prices.length} precios reales de Yahoo Finance para ${benchmark.symbol}`);
-
-      if (prices.length > 0) {
-        await PriceHistory.bulkInsertPrices(prices);
-      }
-
-      return prices;
     }
 
-    // FALLBACK: Generar datos sintéticos si la API falla o no está configurada
-    console.log(`   No se pudieron obtener datos reales, generando sintéticos para ${benchmark.symbol}...`);
+    // ========== PASO 2: INTENTAR OBTENER DATOS REALES DE STEADYAPI ==========
+    console.log(`   🔍 Obteniendo datos REALES de SteadyAPI para benchmark ${benchmark.symbol}...`);
+    const priceService = await import('../utils/priceService.js');
+    
+    try {
+      // Los benchmarks suelen ser ETFs o índices (generalmente tipo STOCKS o ETF)
+      const steadyType = benchmark.category === 'crypto' ? 'STOCKS' : 'STOCKS'; // SteadyAPI solo tiene STOCKS, ETF, MUTUALFUNDS
+
+      const apiPrices = await priceService.default.fetchHistoricalPrices(
+        benchmark.symbol,
+        startBenchmark,
+        endBenchmark,
+        steadyType
+      );
+
+      if (apiPrices && apiPrices.length > 0) {
+        const prices = apiPrices.map((price) => ({
+          assetId: benchmarkId,
+          date: new Date(price.date),
+          open: price.open,
+          high: price.high,
+          low: price.low,
+          close: price.close,
+          volume: price.volume || 0,
+          source: 'steadyapi', // Marcar como datos REALES de SteadyAPI
+          currency: benchmark.currency,
+        }));
+
+        console.log(`   ✅ Obtenidos ${prices.length} precios REALES de SteadyAPI para ${benchmark.symbol}`);
+        console.log(`   💾 Guardando en MongoDB...`);
+
+        if (prices.length > 0) {
+          await PriceHistory.bulkInsertPrices(prices);
+        }
+
+        return prices;
+      }
+    } catch (error) {
+      console.log(`   ⚠️  Error al obtener datos de SteadyAPI: ${error.message}`);
+    }
+
+    // ========== PASO 3: FALLBACK A DATOS SINTÉTICOS ==========
+    console.log(`   📊 Generando precios sintéticos para ${benchmark.symbol} (API no disponible)...`);
 
     // Volatilidades típicas de benchmarks
     const volatilityMap = {
@@ -243,7 +292,7 @@ class BenchmarkService {
         low,
         close: newPrice,
         volume: 0,
-        source: 'synthetic',
+        source: 'synthetic',  // Marcar como sintético
         currency: benchmark.currency,
       });
 
@@ -254,6 +303,7 @@ class BenchmarkService {
       await PriceHistory.bulkInsertPrices(prices);
     }
 
+    console.log(`   📊 Generados ${prices.length} precios sintéticos para ${benchmark.symbol}`);
     return prices;
   }
 

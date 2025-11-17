@@ -6,8 +6,13 @@ import { subDays, subMonths, eachDayOfInterval, startOfDay } from 'date-fns';
 
 class PriceHistoryService {
   /**
-   * Generar historial de precios sintético basado en contribuciones existentes
-   * Este método crea precios históricos realistas usando las contribuciones como puntos de anclaje
+   * Generar historial de precios - OPTIMIZADO para minimizar llamadas a API
+   * 
+   * ESTRATEGIA:
+   * 1. Verificar si ya existen datos históricos en MongoDB
+   * 2. Solo llamar a SteadyAPI si NO hay datos o están incompletos
+   * 3. Guardar datos obtenidos en MongoDB para reutilizarlos
+   * 4. Fallback a datos sintéticos solo si la API falla
    */
   async generateSyntheticPriceHistory(assetId) {
     const asset = await Asset.findById(assetId);
@@ -23,9 +28,88 @@ class PriceHistoryService {
       return [];
     }
 
-    const prices = [];
     const firstDate = contributions[0].date;
     const lastDate = new Date();
+
+    // ========== PASO 1: VERIFICAR SI YA TENEMOS DATOS EN MONGODB ==========
+    const existingPricesCount = await PriceHistory.countDocuments({
+      assetId,
+      date: { $gte: firstDate, $lte: lastDate },
+      source: { $in: ['steadyapi', 'yahoo_finance', 'api'] }, // Solo datos reales, no sintéticos
+    });
+
+    const expectedDays = Math.ceil((lastDate - firstDate) / (1000 * 60 * 60 * 24));
+    const coveragePercentage = (existingPricesCount / expectedDays) * 100;
+
+    if (coveragePercentage > 80) {
+      console.log(`   ✅ Ya existen ${existingPricesCount} precios REALES en MongoDB para ${asset.symbol} (${coveragePercentage.toFixed(0)}% cobertura)`);
+      console.log(`   ⏭️  Saltando llamada a API (usando datos existentes)`);
+      
+      // Retornar datos existentes
+      const existingPrices = await PriceHistory.find({
+        assetId,
+        date: { $gte: firstDate, $lte: lastDate },
+      }).sort({ date: 1 });
+
+      return existingPrices.map((p) => ({
+        assetId: p.assetId,
+        date: p.date,
+        open: p.open,
+        high: p.high,
+        low: p.low,
+        close: p.close,
+        volume: p.volume,
+        source: p.source,
+        currency: p.currency,
+      }));
+    }
+
+    // ========== PASO 2: INTENTAR OBTENER DATOS REALES DE STEADYAPI ==========
+    console.log(`   🔍 Obteniendo datos REALES de SteadyAPI para ${asset.symbol}...`);
+    const priceService = await import('../utils/priceService.js');
+    
+    try {
+      // Determinar tipo de asset para SteadyAPI
+      const assetTypeMap = {
+        stock: 'STOCKS',
+        etf: 'ETF',
+        fund: 'MUTUALFUNDS',
+        mutual_fund: 'MUTUALFUNDS',
+      };
+      const steadyType = assetTypeMap[asset.type] || 'STOCKS';
+
+      const apiPrices = await priceService.default.fetchHistoricalPrices(
+        asset.symbol,
+        firstDate,
+        lastDate,
+        steadyType
+      );
+
+      if (apiPrices && apiPrices.length > 0) {
+        const prices = apiPrices.map((price) => ({
+          assetId,
+          date: new Date(price.date),
+          open: price.open,
+          high: price.high,
+          low: price.low,
+          close: price.close,
+          volume: price.volume || 0,
+          source: 'steadyapi', // Marcar como datos REALES de SteadyAPI
+          currency: asset.currency,
+        }));
+
+        console.log(`   ✅ Obtenidos ${prices.length} precios REALES de SteadyAPI para ${asset.symbol}`);
+        console.log(`   💾 Guardando en MongoDB para reutilizar...`);
+        
+        return prices;
+      }
+    } catch (error) {
+      console.log(`   ⚠️  Error al obtener datos de SteadyAPI: ${error.message}`);
+    }
+
+    // ========== PASO 3: FALLBACK A DATOS SINTÉTICOS ==========
+    console.log(`   📊 Generando precios sintéticos para ${asset.symbol} (API no disponible)...`);
+    const prices = [];
 
     // Generar precios diarios usando interpolación y volatilidad sintética
     const allDays = eachDayOfInterval({ start: firstDate, end: lastDate });
