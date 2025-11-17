@@ -6,191 +6,6 @@
 import axios from 'axios';
 import logger from '../config/logger.js';
 
-const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
-const RAPIDAPI_HOST = process.env.RAPIDAPI_HOST || 'yahoo-finance162.p.rapidapi.com';
-const USE_REAL_API = RAPIDAPI_KEY && RAPIDAPI_KEY !== 'your_rapidapi_key_here';
-
-/**
- * Obtener precio actual de un símbolo via Yahoo Finance (RapidAPI)
- * @param {string} symbol - Símbolo del activo (ej: AAPL, BTC-USD)
- * @param {string} type - Tipo de activo (stock, crypto, etf)
- * @returns {object|null} Datos del precio o null si falla
- */
-export const fetchCurrentPrice = async (symbol, type = 'stock') => {
-  if (!USE_REAL_API) {
-    logger.debug(`Price fetch requested for ${symbol} (${type}) - MANUAL MODE: API key not configured`);
-    return null;
-  }
-
-  try {
-    // Ajustar símbolo según el tipo
-    const adjustedSymbol = adjustSymbolForAPI(symbol, type);
-
-    const options = {
-      method: 'GET',
-      url: `https://${RAPIDAPI_HOST}/api/stock/get-price`,
-      params: { symbol: adjustedSymbol },
-      headers: {
-        'X-RapidAPI-Key': RAPIDAPI_KEY,
-        'X-RapidAPI-Host': RAPIDAPI_HOST,
-      },
-    };
-
-    const response = await axios.request(options);
-
-    if (response.data && response.data.price) {
-      logger.info(`✓ Fetched price for ${symbol}: $${response.data.price}`);
-      return {
-        symbol: symbol,
-        price: response.data.price.regularMarketPrice || response.data.price.postMarketPrice,
-        change: response.data.price.regularMarketChange,
-        changePercent: response.data.price.regularMarketChangePercent,
-        timestamp: new Date(),
-      };
-    }
-
-    return null;
-  } catch (error) {
-    logger.error(`Error fetching price for ${symbol}:`, error.message);
-    return null;
-  }
-};
-
-/**
- * Obtener precios históricos
- * @param {string} symbol - Símbolo del activo
- * @param {Date} startDate - Fecha de inicio
- * @param {Date} endDate - Fecha de fin
- * @returns {Array|null} Array de precios históricos o null
- */
-export const fetchHistoricalPrices = async (symbol, startDate, endDate) => {
-  if (!USE_REAL_API) {
-    logger.debug(`Historical prices requested for ${symbol} - MANUAL MODE: API key not configured`);
-    return null;
-  }
-
-  try {
-    const start = Math.floor(startDate.getTime() / 1000);
-    const end = Math.floor(endDate.getTime() / 1000);
-
-    const options = {
-      method: 'GET',
-      url: `https://${RAPIDAPI_HOST}/api/stock/get-historical-data`,
-      params: {
-        symbol: symbol,
-        period1: start,
-        period2: end,
-        interval: '1d', // daily
-      },
-      headers: {
-        'X-RapidAPI-Key': RAPIDAPI_KEY,
-        'X-RapidAPI-Host': RAPIDAPI_HOST,
-      },
-    };
-
-    const response = await axios.request(options);
-
-    if (response.data && response.data.prices) {
-      const prices = response.data.prices.map((price) => ({
-        date: new Date(price.date * 1000),
-        open: price.open,
-        high: price.high,
-        low: price.low,
-        close: price.close,
-        volume: price.volume,
-      }));
-
-      logger.info(`✓ Fetched ${prices.length} historical prices for ${symbol}`);
-      return prices;
-    }
-
-    return null;
-  } catch (error) {
-    logger.error(`Error fetching historical prices for ${symbol}:`, error.message);
-    return null;
-  }
-};
-
-/**
- * Actualizar precios de múltiples assets
- * @param {Array} assets - Array de assets a actualizar
- * @returns {object} Resumen de la actualización
- */
-export const updateAssetsPrices = async (assets) => {
-  if (!USE_REAL_API) {
-    logger.debug(`Bulk price update requested for ${assets.length} assets - MANUAL MODE: skipping`);
-    return {
-      updated: 0,
-      failed: 0,
-      message: 'Manual mode active - Configure RAPIDAPI_KEY to enable automatic price updates',
-    };
-  }
-
-  let updated = 0;
-  let failed = 0;
-
-  for (const asset of assets) {
-    try {
-      const priceData = await fetchCurrentPrice(asset.symbol, asset.type);
-
-      if (priceData && priceData.price) {
-        // Actualizar el asset con el nuevo precio
-        asset.currentPrice = priceData.price;
-        asset.lastPriceUpdate = new Date();
-        await asset.save();
-        updated++;
-        logger.info(`✓ Updated price for ${asset.symbol}: $${priceData.price}`);
-      } else {
-        failed++;
-        logger.warn(`✗ Could not fetch price for ${asset.symbol}`);
-      }
-
-      // Rate limiting: esperar 200ms entre requests
-      await new Promise((resolve) => setTimeout(resolve, 200));
-    } catch (error) {
-      failed++;
-      logger.error(`✗ Error updating ${asset.symbol}:`, error.message);
-    }
-  }
-
-  return {
-    updated,
-    failed,
-    message: `Updated ${updated} assets, ${failed} failed`,
-  };
-};
-
-/**
- * Validar si un símbolo existe en Yahoo Finance
- * @param {string} symbol - Símbolo a validar
- * @returns {boolean} true si existe, false si no
- */
-export const validateSymbol = async (symbol) => {
-  if (!USE_REAL_API) {
-    logger.debug(`Symbol validation requested for ${symbol} - MANUAL MODE: returning true`);
-    return true; // En modo manual, aceptamos cualquier símbolo
-  }
-
-  try {
-    const priceData = await fetchCurrentPrice(symbol);
-    return priceData !== null;
-  } catch (error) {
-    logger.error(`Error validating symbol ${symbol}:`, error.message);
-    return false;
-  }
-};
-
-/**
- * Ajustar símbolo según el tipo de activo para la API
- * @param {string} symbol - Símbolo original
- * @param {string} type - Tipo de activo
- * @returns {string} Símbolo ajustado
- */
-function adjustSymbolForAPI(symbol, type) {
-  // Para crypto, agregar sufijo -USD si no lo tiene
-  if (type === 'crypto') {
-    if (!symbol.includes('-USD') && !symbol.includes('USDT')) {
-      return `${symbol}-USD`;
 // Configuración de RapidAPI
 const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
 const RAPIDAPI_HOST = process.env.RAPIDAPI_HOST || 'yahoo-finance127.p.rapidapi.com';
@@ -213,7 +28,7 @@ const isAutoMode = () => {
 const getFromCache = (key) => {
   const cached = priceCache.get(key);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-    logger.debug(`Price cache HIT for \${key}`);
+    logger.debug(`Price cache HIT for ${key}`);
     return cached.data;
   }
   return null;
@@ -230,30 +45,27 @@ const saveToCache = (key, data) => {
 };
 
 /**
- * Hacer petición a RapidAPI
+ * Hacer petición a RapidAPI usando axios
  */
 const fetchFromRapidAPI = async (endpoint, symbol) => {
-  const url = `https://\${RAPIDAPI_HOST}\${endpoint}`;
+  const url = `https://${RAPIDAPI_HOST}${endpoint}`;
 
-  logger.debug(`Fetching from RapidAPI: \${endpoint} for \${symbol}`);
+  logger.debug(`Fetching from RapidAPI: ${endpoint} for ${symbol}`);
 
   try {
-    const response = await fetch(url, {
+    const response = await axios({
       method: 'GET',
+      url: url,
       headers: {
         'X-RapidAPI-Key': RAPIDAPI_KEY,
         'X-RapidAPI-Host': RAPIDAPI_HOST,
       },
+      timeout: 10000,
     });
 
-    if (!response.ok) {
-      throw new Error(`RapidAPI responded with status: \${response.status}`);
-    }
-
-    const data = await response.json();
-    return data;
+    return response.data;
   } catch (error) {
-    logger.error(`RapidAPI fetch error for \${symbol}:`, error.message);
+    logger.error(`RapidAPI fetch error for ${symbol}:`, error.response?.data?.message || error.message);
     throw error;
   }
 };
@@ -267,13 +79,13 @@ const fetchFromRapidAPI = async (endpoint, symbol) => {
 export const fetchCurrentPrice = async (symbol, type = 'stock') => {
   // Modo manual: retornar null
   if (!isAutoMode()) {
-    logger.debug(`Price fetch requested for \${symbol} (\${type}) - MANUAL MODE: returning null`);
+    logger.debug(`Price fetch requested for ${symbol} (${type}) - MANUAL MODE: returning null`);
     return null;
   }
 
   try {
     // Verificar caché
-    const cacheKey = `current_\${symbol}`;
+    const cacheKey = `current_${symbol}`;
     const cached = getFromCache(cacheKey);
     if (cached) {
       return cached;
@@ -282,11 +94,11 @@ export const fetchCurrentPrice = async (symbol, type = 'stock') => {
     // Formatear símbolo para crypto (agregar -USD si no está)
     let formattedSymbol = symbol.toUpperCase();
     if (type === 'crypto' && !formattedSymbol.includes('-USD') && !formattedSymbol.includes('USD')) {
-      formattedSymbol = `\${formattedSymbol}-USD`;
+      formattedSymbol = `${formattedSymbol}-USD`;
     }
 
     // Obtener cotización de RapidAPI
-    const data = await fetchFromRapidAPI(`/quote/\${formattedSymbol}`, formattedSymbol);
+    const data = await fetchFromRapidAPI(`/quote/${formattedSymbol}`, formattedSymbol);
 
     // Extraer información relevante
     if (data && data.quoteResponse && data.quoteResponse.result && data.quoteResponse.result.length > 0) {
@@ -310,16 +122,16 @@ export const fetchCurrentPrice = async (symbol, type = 'stock') => {
       // Guardar en caché
       saveToCache(cacheKey, priceData);
 
-      logger.info(`Price fetched for \${symbol}: $\${priceData.price} (\${priceData.changePercent.toFixed(2)}%)`);
+      logger.info(`Price fetched for ${symbol}: $${priceData.price} (${priceData.changePercent?.toFixed(2)}%)`);
 
       return priceData;
     }
 
-    logger.warn(`No price data found for \${symbol}`);
+    logger.warn(`No price data found for ${symbol}`);
     return null;
 
   } catch (error) {
-    logger.error(`Error fetching current price for \${symbol}:`, error.message);
+    logger.error(`Error fetching current price for ${symbol}:`, error.message);
     return null;
   }
 };
@@ -335,13 +147,13 @@ export const fetchCurrentPrice = async (symbol, type = 'stock') => {
 export const fetchHistoricalPrices = async (symbol, startDate, endDate, interval = '1d') => {
   // Modo manual: retornar null
   if (!isAutoMode()) {
-    logger.debug(`Historical prices requested for \${symbol} - MANUAL MODE: returning null`);
+    logger.debug(`Historical prices requested for ${symbol} - MANUAL MODE: returning null`);
     return null;
   }
 
   try {
     // Verificar caché
-    const cacheKey = `historical_\${symbol}_\${startDate}_\${endDate}_\${interval}`;
+    const cacheKey = `historical_${symbol}_${startDate}_${endDate}_${interval}`;
     const cached = getFromCache(cacheKey);
     if (cached) {
       return cached;
@@ -352,7 +164,7 @@ export const fetchHistoricalPrices = async (symbol, startDate, endDate, interval
     const period2 = Math.floor(new Date(endDate).getTime() / 1000);
 
     // Obtener datos históricos de RapidAPI
-    const endpoint = `/chart/\${symbol}?period1=\${period1}&period2=\${period2}&interval=\${interval}`;
+    const endpoint = `/chart/${symbol}?period1=${period1}&period2=${period2}&interval=${interval}`;
     const data = await fetchFromRapidAPI(endpoint, symbol);
 
     // Extraer datos de precios
@@ -379,48 +191,16 @@ export const fetchHistoricalPrices = async (symbol, startDate, endDate, interval
       // Guardar en caché
       saveToCache(cacheKey, historicalData);
 
-      logger.info(`Historical prices fetched for \${symbol}: \${historicalData.length} data points`);
+      logger.info(`Historical prices fetched for ${symbol}: ${historicalData.length} data points`);
 
       return historicalData;
     }
-  }
 
-  return symbol;
-}
-
-/**
- * Obtener quote completo de un símbolo
- * @param {string} symbol - Símbolo del activo
- * @returns {object|null} Quote completo o null
- */
-export const fetchFullQuote = async (symbol) => {
-  if (!USE_REAL_API) {
-    return null;
-  }
-
-  try {
-    const options = {
-      method: 'GET',
-      url: `https://${RAPIDAPI_HOST}/api/stock/get-detail`,
-      params: { symbol },
-      headers: {
-        'X-RapidAPI-Key': RAPIDAPI_KEY,
-        'X-RapidAPI-Host': RAPIDAPI_HOST,
-      },
-    };
-
-    const response = await axios.request(options);
-    return response.data;
-  } catch (error) {
-    logger.error(`Error fetching full quote for ${symbol}:`, error.message);
-    return null;
-  }
-};
-    logger.warn(`No historical data found for \${symbol}`);
+    logger.warn(`No historical data found for ${symbol}`);
     return null;
 
   } catch (error) {
-    logger.error(`Error fetching historical prices for \${symbol}:`, error.message);
+    logger.error(`Error fetching historical prices for ${symbol}:`, error.message);
     return null;
   }
 };
@@ -433,7 +213,7 @@ export const fetchFullQuote = async (symbol) => {
 export const updateAssetsPrices = async (assets) => {
   // Modo manual: skip
   if (!isAutoMode()) {
-    logger.debug(`Bulk price update requested for \${assets.length} assets - MANUAL MODE: skipping`);
+    logger.debug(`Bulk price update requested for ${assets.length} assets - MANUAL MODE: skipping`);
     return {
       updated: 0,
       failed: 0,
@@ -450,7 +230,7 @@ export const updateAssetsPrices = async (assets) => {
     details: [],
   };
 
-  logger.info(`Starting bulk price update for \${assets.length} assets`);
+  logger.info(`Starting bulk price update for ${assets.length} assets`);
 
   for (const asset of assets) {
     try {
@@ -475,8 +255,11 @@ export const updateAssetsPrices = async (assets) => {
       const priceData = await fetchCurrentPrice(asset.symbol, asset.type);
 
       if (priceData && priceData.price) {
-        // Actualizar el asset (esto se haría llamando al assetService)
-        // Por ahora solo registramos el resultado
+        // Actualizar el asset
+        asset.currentPrice = priceData.price;
+        asset.lastPriceUpdate = new Date();
+        await asset.save();
+
         results.updated++;
         results.details.push({
           asset: asset.name,
@@ -487,7 +270,7 @@ export const updateAssetsPrices = async (assets) => {
           status: 'updated',
         });
 
-        logger.debug(`Updated price for \${asset.symbol}: $\${priceData.price}`);
+        logger.debug(`Updated price for ${asset.symbol}: $${priceData.price}`);
       } else {
         results.failed++;
         results.details.push({
@@ -509,11 +292,11 @@ export const updateAssetsPrices = async (assets) => {
         status: 'error',
         reason: error.message,
       });
-      logger.error(`Failed to update price for \${asset.symbol}:`, error.message);
+      logger.error(`Failed to update price for ${asset.symbol}:`, error.message);
     }
   }
 
-  logger.info(`Bulk price update completed: \${results.updated} updated, \${results.failed} failed, \${results.skipped} skipped`);
+  logger.info(`Bulk price update completed: ${results.updated} updated, ${results.failed} failed, ${results.skipped} skipped`);
 
   return results;
 };
@@ -527,7 +310,7 @@ export const updateAssetsPrices = async (assets) => {
 export const validateSymbol = async (symbol, type = 'stock') => {
   // Modo manual: aceptar cualquier símbolo
   if (!isAutoMode()) {
-    logger.debug(`Symbol validation requested for \${symbol} - MANUAL MODE: returning true`);
+    logger.debug(`Symbol validation requested for ${symbol} - MANUAL MODE: returning true`);
     return true;
   }
 
@@ -535,7 +318,7 @@ export const validateSymbol = async (symbol, type = 'stock') => {
     const priceData = await fetchCurrentPrice(symbol, type);
     return priceData !== null;
   } catch (error) {
-    logger.error(`Symbol validation failed for \${symbol}:`, error.message);
+    logger.error(`Symbol validation failed for ${symbol}:`, error.message);
     return false;
   }
 };
@@ -548,12 +331,12 @@ export const validateSymbol = async (symbol, type = 'stock') => {
 export const searchSymbols = async (query) => {
   // Modo manual: retornar vacío
   if (!isAutoMode()) {
-    logger.debug(`Symbol search requested for "\${query}" - MANUAL MODE: returning empty`);
+    logger.debug(`Symbol search requested for "${query}" - MANUAL MODE: returning empty`);
     return [];
   }
 
   try {
-    const data = await fetchFromRapidAPI(`/auto-complete?q=\${encodeURIComponent(query)}`, query);
+    const data = await fetchFromRapidAPI(`/auto-complete?q=${encodeURIComponent(query)}`, query);
 
     if (data && data.ResultSet && data.ResultSet.Result) {
       return data.ResultSet.Result.map(item => ({
@@ -566,7 +349,7 @@ export const searchSymbols = async (query) => {
 
     return [];
   } catch (error) {
-    logger.error(`Symbol search error for "\${query}":`, error.message);
+    logger.error(`Symbol search error for "${query}":`, error.message);
     return [];
   }
 };
@@ -591,8 +374,15 @@ export const getPriceServiceInfo = () => {
 export const clearPriceCache = () => {
   const size = priceCache.size;
   priceCache.clear();
-  logger.info(`Price cache cleared: \${size} entries removed`);
+  logger.info(`Price cache cleared: ${size} entries removed`);
   return { cleared: size };
+};
+
+/**
+ * Obtener quote completo de un símbolo (legacy - mantener por compatibilidad)
+ */
+export const fetchFullQuote = async (symbol) => {
+  return fetchCurrentPrice(symbol);
 };
 
 export default {
