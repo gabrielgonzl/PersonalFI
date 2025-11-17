@@ -3,7 +3,6 @@
  * Integración con steadyapi (RapidAPI) para obtener precios en tiempo real e históricos
  */
 
-import axios from 'axios';
 import logger from '../config/logger.js';
 
 // Configuración de RapidAPI
@@ -390,7 +389,6 @@ export default {
   fetchHistoricalPrices,
   updateAssetsPrices,
   validateSymbol,
-  fetchFullQuote,
   searchSymbols,
   getPriceServiceInfo,
   clearPriceCache,

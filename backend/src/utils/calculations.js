@@ -187,9 +187,20 @@ export const calculateVolatility = (priceHistory) => {
   // Calcular retornos diarios
   const returns = [];
   for (let i = 1; i < priceHistory.length; i++) {
-    const returnValue = (priceHistory[i].price - priceHistory[i - 1].price) / priceHistory[i - 1].price;
+    // Soportar tanto 'price' como 'value' para flexibilidad
+    const currentValue = priceHistory[i].price ?? priceHistory[i].value;
+    const previousValue = priceHistory[i - 1].price ?? priceHistory[i - 1].value;
+
+    if (currentValue === undefined || previousValue === undefined || previousValue === 0) {
+      continue; // Skip invalid data points
+    }
+
+    const returnValue = (currentValue - previousValue) / previousValue;
     returns.push(returnValue);
   }
+
+  // Si no hay suficientes retornos válidos, retornar 0
+  if (returns.length < 2) return 0;
 
   // Calcular promedio de retornos
   const avgReturn = returns.reduce((sum, r) => sum + r, 0) / returns.length;
