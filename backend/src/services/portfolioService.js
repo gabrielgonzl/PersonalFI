@@ -7,6 +7,7 @@ import { AppError } from '../middleware/errorHandler.js';
 import { HTTP_STATUS, ERROR_CODES } from '../config/constants.js';
 import logger from '../config/logger.js';
 import { calculateAllocation, calculateRebalanceNeeds } from '../utils/calculations.js';
+import assetService from './assetService.js';
 
 class PortfolioService {
   /**
@@ -172,6 +173,15 @@ class PortfolioService {
     for (const dist of distributions) {
       const asset = assets.find((a) => a._id.toString() === dist.assetId.toString());
 
+      // Validar precio por unidad
+      if (!dist.pricePerUnit || dist.pricePerUnit <= 0) {
+        throw new AppError(
+          `El precio por unidad debe ser mayor a 0 para el asset ${asset.name}`,
+          HTTP_STATUS.BAD_REQUEST,
+          ERROR_CODES.VALIDATION_ERROR
+        );
+      }
+
       // Calcular cantidad basada en el precio
       const quantity = dist.amount / dist.pricePerUnit;
 
@@ -189,16 +199,14 @@ class PortfolioService {
 
       contributionsCreated.push(contribution);
 
-      // Actualizar asset
-      asset.quantity += quantity;
-      asset.totalInvested += dist.amount;
-      await asset.save();
+      // Actualizar métricas del asset (recalcular desde contribuciones para precisión)
+      const updatedAsset = await assetService.recalculateAssetMetrics(asset._id);
 
       assetsUpdated.push({
-        assetId: asset._id,
-        assetName: asset.name,
-        newQuantity: asset.quantity,
-        newTotalInvested: asset.totalInvested,
+        assetId: updatedAsset._id,
+        assetName: updatedAsset.name,
+        newQuantity: updatedAsset.quantity,
+        newTotalInvested: updatedAsset.totalInvested,
       });
     }
 

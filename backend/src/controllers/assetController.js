@@ -3,6 +3,8 @@
  */
 
 import assetService from '../services/assetService.js';
+import contributionService from '../services/contributionService.js';
+import analyticsService from '../services/analyticsService.js';
 import { successResponse } from '../utils/helpers.js';
 import { HTTP_STATUS } from '../config/constants.js';
 
@@ -21,12 +23,11 @@ class AssetController {
 
       const assets = await assetService.getAllAssets(filters);
 
-      res.json(
-        successResponse({
-          count: assets.length,
-          data: assets,
-        })
-      );
+      res.json({
+        success: true,
+        count: assets.length,
+        data: assets,
+      });
     } catch (error) {
       next(error);
     }
@@ -98,8 +99,6 @@ class AssetController {
    */
   async getAssetContributions(req, res, next) {
     try {
-      const contributionService = (await import('../services/contributionService.js')).default;
-
       const filters = {
         assetId: req.params.id,
         type: req.query.type,
@@ -114,13 +113,12 @@ class AssetController {
 
       const result = await contributionService.getAllContributions(filters, pagination);
 
-      res.json(
-        successResponse({
-          count: result.contributions.length,
-          pagination: result.pagination,
-          data: result.contributions,
-        })
-      );
+      res.json({
+        success: true,
+        count: result.contributions.length,
+        pagination: result.pagination,
+        data: result.contributions,
+      });
     } catch (error) {
       next(error);
     }
@@ -131,7 +129,6 @@ class AssetController {
    */
   async getAssetPerformance(req, res, next) {
     try {
-      const analyticsService = (await import('../services/analyticsService.js')).default;
       const period = req.query.period || 'all';
 
       const performance = await analyticsService.getAssetPerformance(req.params.id, period);

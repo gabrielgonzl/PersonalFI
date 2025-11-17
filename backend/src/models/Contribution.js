@@ -76,9 +76,9 @@ ContributionSchema.index({ assetId: 1, date: -1 });
 ContributionSchema.index({ date: -1 });
 ContributionSchema.index({ type: 1 });
 
-// Middleware pre-save: calcular totalAmount si no está definido
+// Middleware pre-save: calcular totalAmount si campos relacionados cambian
 ContributionSchema.pre('save', function (next) {
-  if (!this.totalAmount || this.isModified('quantity') || this.isModified('pricePerUnit') || this.isModified('fees')) {
+  if (this.isModified('quantity') || this.isModified('pricePerUnit') || this.isModified('fees')) {
     this.totalAmount = this.quantity * this.pricePerUnit + (this.fees || 0);
   }
   next();

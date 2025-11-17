@@ -26,13 +26,12 @@ class ContributionController {
 
       const result = await contributionService.getAllContributions(filters, pagination);
 
-      res.json(
-        successResponse({
-          count: result.contributions.length,
-          pagination: result.pagination,
-          data: result.contributions,
-        })
-      );
+      res.json({
+        success: true,
+        count: result.contributions.length,
+        pagination: result.pagination,
+        data: result.contributions,
+      });
     } catch (error) {
       next(error);
     }

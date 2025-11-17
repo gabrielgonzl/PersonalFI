@@ -33,32 +33,32 @@ export const calculateTWR = (contributions, currentPrice) => {
   // Ordenar por fecha ascendente
   const sorted = [...contributions].sort((a, b) => new Date(a.date) - new Date(b.date));
 
-  let twr = 1;
-  let previousValue = 0;
-
-  for (let i = 0; i < sorted.length; i++) {
-    const contrib = sorted[i];
-    const isLast = i === sorted.length - 1;
-
-    // Valor antes de la aportación
-    const valueBefore = previousValue;
-
-    // Cantidad después de la aportación
-    const quantityAfter = sorted
-      .slice(0, i + 1)
-      .reduce((sum, c) => sum + (c.type === 'buy' ? c.quantity : -c.quantity), 0);
-
-    const valueAfter = quantityAfter * (isLast ? currentPrice : contrib.pricePerUnit);
-
-    // HPR (Holding Period Return) para este período
-    const hpr = valueBefore > 0 ? (valueAfter - valueBefore - contrib.totalAmount) / valueBefore : 0;
-
-    twr *= 1 + hpr;
-    previousValue = valueAfter;
+  // Calcular simple return si solo hay una contribución
+  if (sorted.length === 1 && sorted[0].type === 'buy') {
+    const invested = sorted[0].totalAmount;
+    const currentValue = sorted[0].quantity * currentPrice;
+    return invested > 0 ? Number((((currentValue - invested) / invested) * 100).toFixed(2)) : 0;
   }
 
-  const twrPercentage = (twr - 1) * 100;
-  return Number(twrPercentage.toFixed(2));
+  // TWR para múltiples contribuciones
+  // Simplificación: usar precio promedio ponderado como proxy
+  let totalQuantity = 0;
+  let totalInvested = 0;
+
+  sorted.forEach((contrib) => {
+    if (contrib.type === 'buy') {
+      totalQuantity += contrib.quantity;
+      totalInvested += contrib.totalAmount;
+    } else if (contrib.type === 'sell') {
+      totalQuantity -= contrib.quantity;
+      // No restamos del invested
+    }
+  });
+
+  const currentValue = totalQuantity * currentPrice;
+  const twr = totalInvested > 0 ? ((currentValue - totalInvested) / totalInvested) * 100 : 0;
+
+  return Number(twr.toFixed(2));
 };
 
 /**
@@ -85,7 +85,8 @@ export const calculateMWR = (contributions, currentValue) => {
     contributions.forEach((contrib) => {
       const days = differenceInDays(today, new Date(contrib.date));
       const factor = Math.pow(1 + rate, days / 365);
-      const cashflow = contrib.type === 'buy' ? contrib.totalAmount : -contrib.totalAmount;
+      // Compras son salidas (-), ventas son entradas (+)
+      const cashflow = contrib.type === 'buy' ? -contrib.totalAmount : contrib.totalAmount;
       value += cashflow * factor;
     });
 
@@ -100,7 +101,8 @@ export const calculateMWR = (contributions, currentValue) => {
       const days = differenceInDays(today, new Date(contrib.date));
       const years = days / 365;
       const factor = Math.pow(1 + rate, years - 1);
-      const cashflow = contrib.type === 'buy' ? contrib.totalAmount : -contrib.totalAmount;
+      // Compras son salidas (-), ventas son entradas (+)
+      const cashflow = contrib.type === 'buy' ? -contrib.totalAmount : contrib.totalAmount;
       value += cashflow * years * factor;
     });
 
@@ -296,7 +298,8 @@ export const calculateTimeline = (contributions, currentPrice) => {
       cumulativeInvested += contrib.totalAmount;
       cumulativeQuantity += contrib.quantity;
     } else if (contrib.type === 'sell') {
-      cumulativeInvested -= contrib.totalAmount;
+      // El invested no cambia en ventas, solo la cantidad
+      // cumulativeInvested representa el dinero total que se ha invertido, no el valor actual
       cumulativeQuantity -= contrib.quantity;
     }
 
