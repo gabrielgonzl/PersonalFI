@@ -23,12 +23,11 @@ class AssetController {
 
       const assets = await assetService.getAllAssets(filters);
 
-      res.json(
-        successResponse({
-          count: assets.length,
-          data: assets,
-        })
-      );
+      res.json({
+        success: true,
+        count: assets.length,
+        data: assets,
+      });
     } catch (error) {
       next(error);
     }
@@ -114,13 +113,12 @@ class AssetController {
 
       const result = await contributionService.getAllContributions(filters, pagination);
 
-      res.json(
-        successResponse({
-          count: result.contributions.length,
-          pagination: result.pagination,
-          data: result.contributions,
-        })
-      );
+      res.json({
+        success: true,
+        count: result.contributions.length,
+        pagination: result.pagination,
+        data: result.contributions,
+      });
     } catch (error) {
       next(error);
     }

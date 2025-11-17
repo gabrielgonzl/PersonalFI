@@ -15,12 +15,11 @@ class PortfolioController {
       const includeInactive = req.query.includeInactive === 'true';
       const portfolios = await portfolioService.getAllPortfolios(includeInactive);
 
-      res.json(
-        successResponse({
-          count: portfolios.length,
-          data: portfolios,
-        })
-      );
+      res.json({
+        success: true,
+        count: portfolios.length,
+        data: portfolios,
+      });
     } catch (error) {
       next(error);
     }
