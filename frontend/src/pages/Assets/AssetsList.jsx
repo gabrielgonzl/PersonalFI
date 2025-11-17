@@ -59,13 +59,13 @@ export const AssetsList = () => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-5">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">📊 Mis Activos</h1>
-          <p className="text-gray-600 mt-1">Gestiona y monitorea todos tus activos de inversión</p>
+          <h1 className="text-2xl font-bold text-gray-900">Mis Activos</h1>
+          <p className="text-sm text-gray-600 mt-0.5">Gestiona y monitorea todos tus activos de inversión</p>
         </div>
-        <Button leftIcon={<AddIcon />} onClick={() => navigate('/assets/create')} size="lg" className="shadow-lg">
+        <Button leftIcon={<AddIcon />} onClick={() => navigate('/assets/create')} className="shadow-md">
           Nuevo Activo
         </Button>
       </div>
@@ -95,22 +95,22 @@ export const AssetsList = () => {
       </Card>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-12"><Loading text="Cargando activos..." /></div>
+        <div className="flex items-center justify-center py-10"><Loading text="Cargando activos..." /></div>
       ) : filteredAssets.length > 0 ? (
         viewMode === 'table' ? (
           <AssetsTable assets={filteredAssets} onDelete={(asset) => setDeleteModal({ isOpen: true, asset })} currency={currency} />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredAssets.map((asset) => (<AssetCard key={asset._id} asset={asset} />))}
           </div>
         )
       ) : (
         <Card>
-          <EmptyState icon={<TrendingUpIcon className="w-16 h-16" />}
-            title={searchTerm ? 'No se encontraron activos' : '¡Empieza a invertir!'}
+          <EmptyState icon={<TrendingUpIcon className="w-14 h-14" />}
+            title={searchTerm ? 'No se encontraron activos' : 'Empieza a invertir'}
             description={searchTerm ? 'Intenta con otros términos de búsqueda' : 'Agrega tu primer activo y comienza a rastrear tus inversiones'}
             action={!searchTerm && (
-              <Button leftIcon={<AddIcon />} onClick={() => navigate('/assets/create')} size="lg">Agregar Primer Activo</Button>
+              <Button leftIcon={<AddIcon />} onClick={() => navigate('/assets/create')}>Agregar Primer Activo</Button>
             )} />
         </Card>
       )}

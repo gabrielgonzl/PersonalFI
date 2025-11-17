@@ -48,34 +48,34 @@ export const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-gray-50">
-      <div className="space-y-8 pb-8">
+      <div className="space-y-6 pb-6">
         {/* Hero Header with Total Value */}
-        <div className="bg-gradient-to-r from-primary-600 to-primary-700 rounded-2xl shadow-xl p-8 md:p-10">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+        <div className="bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl shadow-lg p-6 md:p-8">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2">
-                <AccountBalanceWalletIcon className="w-8 h-8 text-white/90" />
-                <h1 className="text-2xl font-semibold text-white/90">Valor Total del Portfolio</h1>
+              <div className="flex items-center gap-2 mb-2">
+                <AccountBalanceWalletIcon className="w-6 h-6 text-white" />
+                <h1 className="text-lg font-semibold text-white">Valor Total del Portfolio</h1>
               </div>
               {overviewLoading ? (
-                <div className="h-16 w-64 bg-white/20 rounded-lg animate-pulse" />
+                <div className="h-12 w-56 bg-white/25 rounded-lg animate-pulse" />
               ) : (
                 <>
-                  <p className="text-5xl md:text-6xl font-bold text-white mb-3">
+                  <p className="text-3xl md:text-4xl font-bold text-white mb-2">
                     {formatCurrency(summary.totalValue || 0, currency)}
                   </p>
                   {summary.profitLoss !== undefined && (
-                    <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full ${
+                    <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full ${
                       summary.profitLoss >= 0
-                        ? 'bg-success-500/20 text-white'
-                        : 'bg-danger-500/20 text-white'
+                        ? 'bg-success-500/30 text-white'
+                        : 'bg-danger-500/30 text-white'
                     }`}>
                       {summary.profitLoss >= 0 ? (
-                        <TrendingUpIcon className="w-5 h-5" />
+                        <TrendingUpIcon className="w-4 h-4" />
                       ) : (
-                        <ShowChartIcon className="w-5 h-5" />
+                        <ShowChartIcon className="w-4 h-4" />
                       )}
-                      <span className="font-semibold text-lg">
+                      <span className="font-semibold text-sm">
                         {summary.profitLoss >= 0 ? '+' : ''}
                         {formatCurrency(summary.profitLoss, currency)}
                         {' '}({summary.profitLossPercentage?.toFixed(2)}%)
@@ -85,20 +85,18 @@ export const Dashboard = () => {
                 </>
               )}
             </div>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-2">
               <Button
                 variant="outline"
                 leftIcon={<AddIcon />}
                 onClick={() => navigate('/assets/create')}
-                size="lg"
-                className="bg-white/10 border-white/30 text-white hover:bg-white/20 backdrop-blur-sm"
+                className="bg-white/20 border-white/40 text-white hover:bg-white/30 backdrop-blur-sm"
               >
                 Nuevo Activo
               </Button>
               <Button
                 leftIcon={<AssessmentIcon />}
                 onClick={() => navigate('/analytics')}
-                size="lg"
                 className="bg-white text-primary-600 hover:bg-white/90"
               >
                 Ver Analíticas
@@ -108,12 +106,12 @@ export const Dashboard = () => {
         </div>
 
         {/* Metrics Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <MetricCard
             title="Total Invertido"
             value={summary.totalInvested || 0}
             currency={currency}
-            icon={<TrendingUpIcon className="w-6 h-6" />}
+            icon={<TrendingUpIcon className="w-5 h-5" />}
             iconColor="text-primary-600"
             loading={overviewLoading}
           />
@@ -122,7 +120,7 @@ export const Dashboard = () => {
             value={summary.profitLoss || 0}
             change={summary.profitLossPercentage}
             currency={currency}
-            icon={<ShowChartIcon className="w-6 h-6" />}
+            icon={<ShowChartIcon className="w-5 h-5" />}
             iconColor={summary.profitLoss >= 0 ? 'text-success-600' : 'text-danger-600'}
             loading={overviewLoading}
           />
@@ -130,19 +128,19 @@ export const Dashboard = () => {
             title="Número de Activos"
             value={summary.assetsCount || 0}
             currency={currency}
-            icon={<PieChartIcon className="w-6 h-6" />}
+            icon={<PieChartIcon className="w-5 h-5" />}
             iconColor="text-warning-600"
             loading={overviewLoading}
           />
         </div>
 
         {/* Charts Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Performance Chart */}
           <Card
-            title="📈 Evolución del Portfolio"
+            title="Evolución del Portfolio"
             subtitle="Últimos 30 días"
-            className="shadow-lg hover:shadow-xl transition-shadow duration-300"
+            className="shadow-md hover:shadow-lg transition-shadow duration-300"
           >
             {performanceLoading ? (
               <div className="flex items-center justify-center h-80">
@@ -153,7 +151,7 @@ export const Dashboard = () => {
                 data={performance.data}
                 lines={[{ dataKey: 'value', name: 'Valor del Portfolio', color: '#0ea5e9' }]}
                 currency={currency}
-                height={320}
+                height={280}
               />
             ) : (
               <EmptyState
@@ -165,9 +163,9 @@ export const Dashboard = () => {
 
           {/* Distribution Chart */}
           <Card
-            title="🥧 Distribución de Activos"
+            title="Distribución de Activos"
             subtitle="Por tipo de inversión"
-            className="shadow-lg hover:shadow-xl transition-shadow duration-300"
+            className="shadow-md hover:shadow-lg transition-shadow duration-300"
           >
             {distributionLoading ? (
               <div className="flex items-center justify-center h-80">
@@ -179,7 +177,7 @@ export const Dashboard = () => {
                 nameKey="type"
                 valueKey="value"
                 currency={currency}
-                height={320}
+                height={280}
               />
             ) : (
               <EmptyState
@@ -193,8 +191,8 @@ export const Dashboard = () => {
         {/* Portfolios Section */}
         {portfolios.length > 0 && (
           <div>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-3xl font-bold text-gray-900">💼 Tus Carteras</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold text-gray-900">Tus Carteras</h2>
               <Button
                 variant="ghost"
                 onClick={() => navigate('/portfolios')}
@@ -203,7 +201,7 @@ export const Dashboard = () => {
                 Ver Todas →
               </Button>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {portfoliosLoading ? (
                 <Loading />
               ) : (
@@ -218,8 +216,8 @@ export const Dashboard = () => {
         {/* Recent Assets Section */}
         {assets.length > 0 && (
           <div>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-3xl font-bold text-gray-900">📊 Tus Activos</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold text-gray-900">Tus Activos</h2>
               <Button
                 variant="ghost"
                 onClick={() => navigate('/assets')}
@@ -228,7 +226,7 @@ export const Dashboard = () => {
                 Ver Todos →
               </Button>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {assetsLoading ? (
                 <Loading />
               ) : (
@@ -242,18 +240,17 @@ export const Dashboard = () => {
 
         {/* Empty State */}
         {!overviewLoading && portfolios.length === 0 && assets.length === 0 && (
-          <Card className="shadow-xl">
+          <Card className="shadow-md">
             <EmptyState
-              icon={<AccountBalanceWalletIcon className="w-20 h-20" />}
-              title="¡Bienvenido a Growing! 🎉"
+              icon={<AccountBalanceWalletIcon className="w-16 h-16" />}
+              title="Bienvenido a Growing"
               description="Comienza a rastrear tus inversiones creando tu primer activo y observa cómo crece tu patrimonio"
               action={
-                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
                   <Button
                     leftIcon={<AddIcon />}
                     onClick={() => navigate('/assets/create')}
-                    size="lg"
-                    className="shadow-lg"
+                    className="shadow-md"
                   >
                     Agregar Primer Activo
                   </Button>
@@ -261,7 +258,6 @@ export const Dashboard = () => {
                     variant="outline"
                     leftIcon={<AddIcon />}
                     onClick={() => navigate('/portfolios/create')}
-                    size="lg"
                   >
                     Crear Cartera
                   </Button>
