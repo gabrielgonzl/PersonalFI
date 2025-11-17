@@ -70,4 +70,11 @@ router.get('/recommended-benchmark', analyticsController.getRecommendedBenchmark
  */
 router.get('/benchmark/:symbol', analyticsController.compareWithBenchmark);
 
+/**
+ * @route   POST /api/v1/analytics/benchmarks/initialize
+ * @desc    Inicializar benchmarks predeterminados
+ * @access  Public
+ */
+router.post('/benchmarks/initialize', analyticsController.initializeBenchmarks);
+
 export default router;

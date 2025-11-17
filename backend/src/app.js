@@ -79,6 +79,7 @@ app.get('/', (req, res) => {
       portfolios: '/api/v1/portfolios',
       analytics: '/api/v1/analytics',
       settings: '/api/v1/settings',
+      prices: '/api/v1/prices',
     },
   });
 });

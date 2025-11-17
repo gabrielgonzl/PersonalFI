@@ -22,6 +22,21 @@ const startServer = async () => {
     // Conectar a MongoDB
     await connectDB();
 
+    // Inicializar benchmarks si no existen
+    try {
+      const { default: benchmarkService } = await import('./services/benchmarkService.js');
+      const { Benchmark } = await import('./models/index.js');
+
+      const benchmarkCount = await Benchmark.countDocuments();
+      if (benchmarkCount === 0) {
+        logger.info('📊 Initializing default benchmarks...');
+        await benchmarkService.initializeDefaultBenchmarks();
+        logger.info('✅ Default benchmarks initialized');
+      }
+    } catch (error) {
+      logger.warn('⚠️  Failed to initialize benchmarks:', error.message);
+    }
+
     // Iniciar servidor Express
     const server = app.listen(PORT, () => {
       logger.info('='.repeat(50));

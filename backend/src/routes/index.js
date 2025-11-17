@@ -8,6 +8,7 @@ import contributionRoutes from './contributions.js';
 import portfolioRoutes from './portfolios.js';
 import analyticsRoutes from './analytics.js';
 import settingsRoutes from './settings.js';
+import priceRoutes from './priceRoutes.js';
 
 const router = express.Router();
 
@@ -17,6 +18,7 @@ router.use('/contributions', contributionRoutes);
 router.use('/portfolios', portfolioRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/settings', settingsRoutes);
+router.use('/prices', priceRoutes);
 
 // Ruta de health check
 router.get('/health', (req, res) => {
