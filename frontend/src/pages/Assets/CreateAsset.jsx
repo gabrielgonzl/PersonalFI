@@ -36,7 +36,9 @@ export const CreateAsset = () => {
     },
   });
 
-  const portfolios = portfoliosData?.data || [];
+  const portfolios = Array.isArray(portfoliosData?.data)
+    ? portfoliosData.data
+    : [];
 
   const onSubmit = async (data) => {
     try {

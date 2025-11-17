@@ -4,6 +4,8 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { queryClient } from './config/queryClient';
 import { AppProvider } from './context/AppContext';
+import { ThemeProvider } from './context/ThemeContext';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { Layout } from './components/layout/Layout';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { LoadingSpinner } from './components/common/LoadingSpinner';
@@ -46,9 +48,14 @@ function App() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <AppProvider>
-          <BrowserRouter>
-            <Layout>
-              <Suspense fallback={<LoadingSpinner fullScreen />}>
+          <ThemeProvider>
+            <BrowserRouter
+              future={{
+                v7_startTransition: true,
+                v7_relativeSplatPath: true,
+              }}
+            >
+              <Layout>
                 <Routes>
                   {/* Dashboard */}
                   <Route path="/" element={<Dashboard />} />
@@ -74,12 +81,10 @@ function App() {
                   {/* 404 - Redirect to dashboard */}
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
-              </Suspense>
-            </Layout>
-          </BrowserRouter>
+              </Layout>
+            </BrowserRouter>
+          </ThemeProvider>
         </AppProvider>
-        {/* React Query Devtools - only in development */}
-        {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
       </QueryClientProvider>
     </ErrorBoundary>
   );
