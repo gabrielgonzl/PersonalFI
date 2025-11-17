@@ -71,10 +71,10 @@ export const ContributionForm = ({
   ];
 
   return (
-    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
-      <div className="bg-primary-50 border border-primary-200 rounded-lg p-4">
+    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-5">
+      <div className="bg-primary-50 border border-primary-200 rounded-lg p-3">
         <p className="text-sm text-primary-800">
-          💡 Registra aquí tus compras, ventas o transferencias de activos
+          Registra aquí tus compras, ventas o transferencias de activos
         </p>
       </div>
 
@@ -85,7 +85,7 @@ export const ContributionForm = ({
         error={errors.assetId?.message}
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <Input
           label="Fecha *"
           type="date"
@@ -101,7 +101,7 @@ export const ContributionForm = ({
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <Input
           label="Cantidad *"
           type="number"
@@ -132,7 +132,7 @@ export const ContributionForm = ({
         helperText={calculatedTotal > 0 ? `Calculado: ${formatCurrency(calculatedTotal, currency)}` : ''}
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <Input
           label="Comisiones"
           type="number"
@@ -160,7 +160,7 @@ export const ContributionForm = ({
         rows={3}
       />
 
-      <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
+      <div className="flex justify-end space-x-3 pt-5 border-t border-gray-200">
         <Button variant="outline" onClick={onCancel} type="button">
           Cancelar
         </Button>

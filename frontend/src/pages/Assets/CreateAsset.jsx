@@ -45,7 +45,7 @@ export const CreateAsset = () => {
       if (!data.icon) delete data.icon;
 
       const result = await createAssetMutation.mutateAsync(data);
-      showSuccess('✅ Activo creado exitosamente');
+      showSuccess('Activo creado exitosamente');
       navigate(`/assets/${result.data._id}`);
     } catch (error) {
       showError(error.message || 'Error al crear el activo');
@@ -60,31 +60,31 @@ export const CreateAsset = () => {
   ];
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      <div className="flex items-center space-x-4">
+    <div className="max-w-3xl mx-auto space-y-5">
+      <div className="flex items-center space-x-3">
         <Button variant="ghost" onClick={() => navigate('/assets')} className="p-2">
           <ArrowBackIcon />
         </Button>
-        <div className="flex items-center gap-3">
-          <div className="p-3 bg-primary-100 rounded-xl">
-            <TrendingUpIcon className="w-8 h-8 text-primary-600" />
+        <div className="flex items-center gap-2.5">
+          <div className="p-2.5 bg-primary-100 rounded-lg">
+            <TrendingUpIcon className="w-6 h-6 text-primary-600" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Crear Nuevo Activo</h1>
-            <p className="text-gray-600 mt-1">Agrega un nuevo activo de inversión a tu cartera</p>
+            <h1 className="text-2xl font-bold text-gray-900">Crear Nuevo Activo</h1>
+            <p className="text-sm text-gray-600 mt-0.5">Agrega un nuevo activo de inversión a tu cartera</p>
           </div>
         </div>
       </div>
 
-      <Card className="shadow-lg">
-        <div className="bg-gradient-to-r from-primary-50 to-blue-50 border border-primary-200 rounded-lg p-4 mb-6">
+      <Card className="shadow-md">
+        <div className="bg-gradient-to-r from-primary-50 to-blue-50 border border-primary-200 rounded-lg p-3 mb-5">
           <p className="text-sm text-primary-800 font-medium">
-            💡 Define los datos básicos de tu activo. Podrás registrar transacciones después.
+            Define los datos básicos de tu activo. Podrás registrar transacciones después.
           </p>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <Input
               label="Nombre del Activo *"
               {...register('name')}
@@ -141,11 +141,11 @@ export const CreateAsset = () => {
             helperText="Opcional: estrategia, objetivos, etc."
           />
 
-          <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
+          <div className="flex justify-end space-x-3 pt-5 border-t border-gray-200">
             <Button variant="outline" onClick={() => navigate('/assets')} type="button">
               Cancelar
             </Button>
-            <Button type="submit" loading={createAssetMutation.isLoading} size="lg">
+            <Button type="submit" loading={createAssetMutation.isLoading}>
               Crear Activo
             </Button>
           </div>

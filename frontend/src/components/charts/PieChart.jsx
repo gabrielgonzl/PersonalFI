@@ -39,10 +39,13 @@ export const PieChart = ({
       <text
         x={x}
         y={y}
-        fill="white"
+        fill="#1f2937"
         textAnchor={x > cx ? 'start' : 'end'}
         dominantBaseline="central"
-        className="text-xs font-semibold"
+        className="text-xs font-bold"
+        style={{
+          textShadow: '0 0 4px white, 0 0 4px white, 0 0 4px white, 0 0 4px white',
+        }}
       >
         {`${formatPercentage(percent * 100, 0)}`}
       </text>
