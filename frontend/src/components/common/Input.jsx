@@ -1,4 +1,6 @@
-export const Input = ({
+import { forwardRef } from 'react';
+
+export const Input = forwardRef(({
   label,
   type = 'text',
   error,
@@ -8,7 +10,7 @@ export const Input = ({
   fullWidth = true,
   className = '',
   ...props
-}) => {
+}, ref) => {
   return (
     <div className={fullWidth ? 'w-full' : ''}>
       {label && (
@@ -23,6 +25,7 @@ export const Input = ({
           </div>
         )}
         <input
+          ref={ref}
           type={type}
           className={`
             block w-full rounded-lg border
@@ -50,9 +53,11 @@ export const Input = ({
       )}
     </div>
   );
-};
+});
 
-export const Select = ({
+Input.displayName = 'Input';
+
+export const Select = forwardRef(({
   label,
   error,
   helperText,
@@ -60,7 +65,7 @@ export const Select = ({
   fullWidth = true,
   className = '',
   ...props
-}) => {
+}, ref) => {
   return (
     <div className={fullWidth ? 'w-full' : ''}>
       {label && (
@@ -69,6 +74,7 @@ export const Select = ({
         </label>
       )}
       <select
+        ref={ref}
         className={`
           block w-full rounded-lg border
           ${error ? 'border-danger-300 focus:border-danger-500 focus:ring-danger-500' : 'border-gray-300 focus:border-primary-500 focus:ring-primary-500'}
@@ -93,9 +99,11 @@ export const Select = ({
       )}
     </div>
   );
-};
+});
 
-export const Textarea = ({
+Select.displayName = 'Select';
+
+export const Textarea = forwardRef(({
   label,
   error,
   helperText,
@@ -103,7 +111,7 @@ export const Textarea = ({
   rows = 4,
   className = '',
   ...props
-}) => {
+}, ref) => {
   return (
     <div className={fullWidth ? 'w-full' : ''}>
       {label && (
@@ -112,6 +120,7 @@ export const Textarea = ({
         </label>
       )}
       <textarea
+        ref={ref}
         rows={rows}
         className={`
           block w-full rounded-lg border
@@ -131,4 +140,6 @@ export const Textarea = ({
       )}
     </div>
   );
-};
+});
+
+Textarea.displayName = 'Textarea';
