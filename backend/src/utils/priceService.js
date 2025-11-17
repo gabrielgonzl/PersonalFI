@@ -57,8 +57,8 @@ const fetchFromRapidAPI = async (endpoint, symbol) => {
       method: 'GET',
       url: url,
       headers: {
-        'X-RapidAPI-Key': RAPIDAPI_KEY,
-        'X-RapidAPI-Host': RAPIDAPI_HOST,
+        'x-rapidapi-key': RAPIDAPI_KEY,
+        'x-rapidapi-host': RAPIDAPI_HOST,
       },
       timeout: 10000,
     });

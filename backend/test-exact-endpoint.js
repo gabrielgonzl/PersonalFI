@@ -32,9 +32,8 @@ async function testExactEndpoint() {
       url: `https://${RAPIDAPI_HOST}${endpoint}`,
       params: params,
       headers: {
-        'X-RapidAPI-Key': RAPIDAPI_KEY,
-        'X-RapidAPI-Host': RAPIDAPI_HOST,
-        'Accept': 'application/json',
+        'x-rapidapi-key': RAPIDAPI_KEY,
+        'x-rapidapi-host': RAPIDAPI_HOST,
       },
       timeout: 10000,
     });
