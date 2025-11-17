@@ -89,7 +89,15 @@ const fetchFromRapidAPI = async (endpoint, symbol, retryCount = 0) => {
     }
 
     // Si no es un error de red o ya agotamos los reintentos, lanzar el error
-    logger.error(`RapidAPI fetch error for ${symbol}:`, error.response?.data?.message || error.message);
+    const statusCode = error.response?.status || 'N/A';
+    const errorData = error.response?.data;
+    const errorMessage = error.response?.data?.message || error.message;
+
+    logger.error(`RapidAPI fetch error for ${symbol} [${statusCode}]: ${errorMessage}`);
+    if (errorData && typeof errorData === 'object') {
+      logger.error(`Error details:`, JSON.stringify(errorData));
+    }
+
     throw error;
   }
 };
