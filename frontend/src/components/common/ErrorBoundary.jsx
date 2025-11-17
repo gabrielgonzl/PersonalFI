@@ -1,6 +1,7 @@
 import { Component } from 'react';
 import { Card } from './Card';
 import { Button } from './Button';
+import { es } from '../../locales/es';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 
 export class ErrorBoundary extends Component {
@@ -36,11 +37,11 @@ export class ErrorBoundary extends Component {
               <ErrorOutlineIcon className="text-danger-500 mx-auto mb-4" style={{ fontSize: 80 }} />
 
               <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                Oops! Something went wrong
+                {es.common.errorOccurred}
               </h1>
 
               <p className="text-gray-600 mb-6">
-                The application encountered an unexpected error. Don&apos;t worry, your data is safe.
+                {es.common.errorDescription}
               </p>
 
               {this.state.error && (
@@ -63,10 +64,10 @@ export class ErrorBoundary extends Component {
 
               <div className="flex justify-center gap-3">
                 <Button variant="outline" onClick={() => window.history.back()}>
-                  Go Back
+                  {es.common.goBack}
                 </Button>
                 <Button onClick={this.handleReset}>
-                  Return to Dashboard
+                  {es.common.returnToDashboard}
                 </Button>
               </div>
             </div>

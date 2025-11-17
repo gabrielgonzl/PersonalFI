@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAssets } from '../../hooks/useAssets';
+import { useTranslation } from '../../hooks/useTranslation';
 import { AssetCard } from '../../components/features/AssetCard';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
@@ -14,6 +15,7 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 
 export const AssetsList = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [filters, setFilters] = useState({
     type: '',
     portfolioId: '',
@@ -26,15 +28,15 @@ export const AssetsList = () => {
   const assets = data?.data || [];
 
   const typeOptions = [
-    { value: '', label: 'All Types' },
+    { value: '', label: t('assets.allTypes') },
     ...Object.entries(ASSET_TYPE_LABELS).map(([value, label]) => ({ value, label })),
   ];
 
   const sortOptions = [
-    { value: 'currentValue', label: 'Current Value' },
-    { value: 'profitLossPercentage', label: 'Profit/Loss %' },
-    { value: 'name', label: 'Name' },
-    { value: 'createdAt', label: 'Date Created' },
+    { value: 'currentValue', label: t('assets.currentValue') },
+    { value: 'profitLossPercentage', label: t('assets.profitLoss') },
+    { value: 'name', label: t('createAsset.assetName') },
+    { value: 'createdAt', label: t('common.create') },
   ];
 
   if (error) {
@@ -50,14 +52,14 @@ export const AssetsList = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Assets</h1>
-          <p className="text-gray-600 mt-1">Manage your investment assets</p>
+          <h1 className="text-3xl font-bold text-gray-900">{t('assets.title')}</h1>
+          <p className="text-gray-600 mt-1">{t('assets.subtitle')}</p>
         </div>
         <Button
           leftIcon={<AddIcon />}
           onClick={() => navigate('/assets/create')}
         >
-          Add Asset
+          {t('assets.addAsset')}
         </Button>
       </div>
 
@@ -65,26 +67,26 @@ export const AssetsList = () => {
       <Card>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Select
-            label="Asset Type"
+            label={t('assets.assetType')}
             value={filters.type}
             onChange={(e) => setFilters({ ...filters, type: e.target.value })}
             options={typeOptions}
           />
 
           <Select
-            label="Sort By"
+            label={t('assets.sortBy')}
             value={filters.sortBy}
             onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
             options={sortOptions}
           />
 
           <Select
-            label="Order"
+            label={t('assets.order')}
             value={filters.sortOrder}
             onChange={(e) => setFilters({ ...filters, sortOrder: e.target.value })}
             options={[
-              { value: 'desc', label: 'Descending' },
-              { value: 'asc', label: 'Ascending' },
+              { value: 'desc', label: t('assets.descending') },
+              { value: 'asc', label: t('assets.ascending') },
             ]}
           />
         </div>
@@ -92,7 +94,7 @@ export const AssetsList = () => {
 
       {/* Assets Grid */}
       {isLoading ? (
-        <Loading text="Loading assets..." />
+        <Loading text={t('common.loading')} />
       ) : assets.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {assets.map((asset) => (
@@ -103,14 +105,14 @@ export const AssetsList = () => {
         <Card>
           <EmptyState
             icon={<TrendingUpIcon />}
-            title="No assets found"
-            description="Start building your portfolio by adding your first asset"
+            title={t('assets.noAssetsFound')}
+            description={t('assets.noAssetsDescription')}
             action={
               <Button
                 leftIcon={<AddIcon />}
                 onClick={() => navigate('/assets/create')}
               >
-                Add Your First Asset
+                {t('assets.addFirstAsset')}
               </Button>
             }
           />
