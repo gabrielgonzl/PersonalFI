@@ -71,6 +71,16 @@ class ContributionService {
       throw new AppError('Asset no encontrado', HTTP_STATUS.NOT_FOUND, ERROR_CODES.RESOURCE_NOT_FOUND);
     }
 
+    // No permitir contribuciones para assets de tipo 'cash'
+    // El cash se maneja automáticamente o a través de /portfolios/:id/add-cash
+    if (asset.type === 'cash') {
+      throw new AppError(
+        'No se pueden crear contribuciones para activos de tipo "cash". Use /portfolios/:id/add-cash para agregar efectivo.',
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR
+      );
+    }
+
     // Si el asset pertenece a un portfolio, validar fondos disponibles para compras
     if (data.type === 'buy' && asset.portfolioId) {
       const portfolio = await Portfolio.findById(asset.portfolioId);

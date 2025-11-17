@@ -10,6 +10,7 @@ import logger from '../config/logger.js';
 class AssetService {
   /**
    * Obtener todos los assets con filtros
+   * Si se filtra por portfolioId, incluye el efectivo del portfolio como un asset virtual
    */
   async getAllAssets(filters = {}) {
     const query = {};
@@ -20,17 +21,97 @@ class AssetService {
     const sortBy = filters.sortBy || 'createdAt';
     const order = filters.order === 'asc' ? 1 : -1;
 
-    const assets = await Asset.find(query)
+    let assets = await Asset.find(query)
       .populate('portfolioId', 'name color')
       .sort({ [sortBy]: order });
+
+    // Si se filtra por portfolio, agregar el efectivo como asset virtual
+    if (filters.portfolioId) {
+      const portfolio = await Portfolio.findById(filters.portfolioId);
+
+      if (portfolio && portfolio.cashBalance > 0) {
+        // Crear asset virtual para el efectivo
+        const cashAsset = {
+          _id: `cash_${portfolio._id}`,
+          name: 'Efectivo',
+          symbol: portfolio.currency || 'USD',
+          type: 'cash',
+          currency: portfolio.currency || 'USD',
+          portfolioId: {
+            _id: portfolio._id,
+            name: portfolio.name,
+            color: portfolio.color,
+          },
+          quantity: portfolio.cashBalance,
+          currentPrice: 1,
+          currentValue: portfolio.cashBalance,
+          totalInvested: portfolio.cashBalance,
+          averagePrice: 1,
+          profitLoss: 0,
+          profitLossPercentage: 0,
+          notes: 'Efectivo disponible en el portfolio',
+          color: '#10B981', // Verde para cash
+          isCash: true, // Flag para identificarlo como cash
+          lastPriceUpdate: new Date(),
+          createdAt: portfolio.createdAt,
+          updatedAt: portfolio.updatedAt,
+        };
+
+        // Convertir assets a plain objects si es necesario
+        assets = assets.map(a => a.toObject ? a.toObject() : a);
+
+        // Agregar el cash asset al inicio
+        assets.unshift(cashAsset);
+      }
+    }
 
     return assets;
   }
 
   /**
    * Obtener un asset por ID
+   * Maneja assets virtuales de cash con ID formato: cash_${portfolioId}
    */
   async getAssetById(id) {
+    // Si el ID es de un asset de cash virtual
+    if (typeof id === 'string' && id.startsWith('cash_')) {
+      const portfolioId = id.replace('cash_', '');
+      const portfolio = await Portfolio.findById(portfolioId);
+
+      if (!portfolio) {
+        throw new AppError('Portfolio no encontrado', HTTP_STATUS.NOT_FOUND, ERROR_CODES.RESOURCE_NOT_FOUND);
+      }
+
+      // Retornar asset virtual de cash
+      return {
+        _id: id,
+        name: 'Efectivo',
+        symbol: portfolio.currency || 'USD',
+        type: 'cash',
+        currency: portfolio.currency || 'USD',
+        portfolioId: {
+          _id: portfolio._id,
+          name: portfolio.name,
+          color: portfolio.color,
+          currency: portfolio.currency,
+        },
+        quantity: portfolio.cashBalance,
+        currentPrice: 1,
+        currentValue: portfolio.cashBalance,
+        totalInvested: portfolio.cashBalance,
+        averagePrice: 1,
+        profitLoss: 0,
+        profitLossPercentage: 0,
+        notes: 'Efectivo disponible en el portfolio',
+        color: '#10B981',
+        isCash: true,
+        lastPriceUpdate: new Date(),
+        createdAt: portfolio.createdAt,
+        updatedAt: portfolio.updatedAt,
+      };
+    }
+
+    // Asset normal
     const asset = await Asset.findById(id).populate('portfolioId', 'name color currency');
 
     if (!asset) {
@@ -62,6 +143,15 @@ class AssetService {
    * Actualizar asset
    */
   async updateAsset(id, updates) {
+    // No permitir actualizar assets de cash virtuales
+    if (typeof id === 'string' && id.startsWith('cash_')) {
+      throw new AppError(
+        'No se pueden actualizar activos de tipo "cash". El efectivo se maneja automáticamente.',
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR
+      );
+    }
+
     const asset = await Asset.findById(id);
 
     if (!asset) {
@@ -87,6 +177,15 @@ class AssetService {
    * Actualizar precio de un asset
    */
   async updatePrice(id, newPrice) {
+    // No permitir actualizar precio de assets de cash (siempre es 1)
+    if (typeof id === 'string' && id.startsWith('cash_')) {
+      throw new AppError(
+        'No se puede actualizar el precio del efectivo (siempre es 1).',
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR
+      );
+    }
+
     const asset = await Asset.findById(id);
 
     if (!asset) {
@@ -110,6 +209,15 @@ class AssetService {
    * Eliminar asset
    */
   async deleteAsset(id) {
+    // No permitir eliminar assets de cash virtuales
+    if (typeof id === 'string' && id.startsWith('cash_')) {
+      throw new AppError(
+        'No se pueden eliminar activos de tipo "cash". El efectivo es parte del portfolio.',
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR
+      );
+    }
+
     const asset = await Asset.findById(id);
 
     if (!asset) {

@@ -7,6 +7,7 @@ export const ASSET_TYPES = {
   STOCK: 'stock',
   ETF: 'etf',
   FUND: 'fund',
+  CASH: 'cash',
   OTHER: 'other',
 };
 
