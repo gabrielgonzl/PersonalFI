@@ -44,7 +44,7 @@ const saveToCache = (key, data) => {
 };
 
 /**
- * Hacer petición a RapidAPI
+ * Hacer petición a RapidAPI usando axios
  */
 const fetchFromRapidAPI = async (endpoint, symbol) => {
   const url = `https://${RAPIDAPI_HOST}${endpoint}`;
@@ -52,22 +52,19 @@ const fetchFromRapidAPI = async (endpoint, symbol) => {
   logger.debug(`Fetching from RapidAPI: ${endpoint} for ${symbol}`);
 
   try {
-    const response = await fetch(url, {
+    const response = await axios({
       method: 'GET',
+      url: url,
       headers: {
         'X-RapidAPI-Key': RAPIDAPI_KEY,
         'X-RapidAPI-Host': RAPIDAPI_HOST,
       },
+      timeout: 10000,
     });
 
-    if (!response.ok) {
-      throw new Error(`RapidAPI responded with status: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data;
+    return response.data;
   } catch (error) {
-    logger.error(`RapidAPI fetch error for ${symbol}:`, error.message);
+    logger.error(`RapidAPI fetch error for ${symbol}:`, error.response?.data?.message || error.message);
     throw error;
   }
 };
@@ -124,7 +121,7 @@ export const fetchCurrentPrice = async (symbol, type = 'stock') => {
       // Guardar en caché
       saveToCache(cacheKey, priceData);
 
-      logger.info(`Price fetched for ${symbol}: $${priceData.price} (${priceData.changePercent.toFixed(2)}%)`);
+      logger.info(`Price fetched for ${symbol}: $${priceData.price} (${priceData.changePercent?.toFixed(2)}%)`);
 
       return priceData;
     }
@@ -257,8 +254,11 @@ export const updateAssetsPrices = async (assets) => {
       const priceData = await fetchCurrentPrice(asset.symbol, asset.type);
 
       if (priceData && priceData.price) {
-        // Actualizar el asset (esto se haría llamando al assetService)
-        // Por ahora solo registramos el resultado
+        // Actualizar el asset
+        asset.currentPrice = priceData.price;
+        asset.lastPriceUpdate = new Date();
+        await asset.save();
+
         results.updated++;
         results.details.push({
           asset: asset.name,
@@ -375,6 +375,13 @@ export const clearPriceCache = () => {
   priceCache.clear();
   logger.info(`Price cache cleared: ${size} entries removed`);
   return { cleared: size };
+};
+
+/**
+ * Obtener quote completo de un símbolo (legacy - mantener por compatibilidad)
+ */
+export const fetchFullQuote = async (symbol) => {
+  return fetchCurrentPrice(symbol);
 };
 
 export default {
