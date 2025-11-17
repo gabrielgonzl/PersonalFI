@@ -1,13 +1,12 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+// import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { queryClient } from './config/queryClient';
 import { AppProvider } from './context/AppContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { Layout } from './components/layout/Layout';
-import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { LoadingSpinner } from './components/common/LoadingSpinner';
 
 // Lazy load pages for better performance
