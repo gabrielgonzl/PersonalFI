@@ -86,8 +86,9 @@ class AssetController {
    */
   async updatePrice(req, res, next) {
     try {
-      const { currentPrice } = req.body;
-      const asset = await assetService.updatePrice(req.params.id, currentPrice);
+      // Aceptar currentPrice, price, o newPrice para mayor flexibilidad
+      const price = req.body.currentPrice ?? req.body.price ?? req.body.newPrice;
+      const asset = await assetService.updatePrice(req.params.id, price);
       res.json(successResponse(asset));
     } catch (error) {
       next(error);
