@@ -154,14 +154,49 @@ class BenchmarkService {
   }
 
   /**
-   * Generar precios sintéticos para benchmark
-   * (Similar a assets pero con volatilidad específica de índices)
+   * Generar precios para benchmark (intenta RapidAPI primero, luego sintéticos)
    */
   async generateSyntheticBenchmarkPrices(benchmarkId, startDate, endDate) {
     const benchmark = await Benchmark.findById(benchmarkId);
     if (!benchmark) {
       throw new Error('Benchmark not found');
     }
+
+    // PRIMERO: Intentar obtener datos reales de RapidAPI
+    const priceService = await import('../utils/priceService.js');
+    console.log(`   Intentando obtener datos reales de Yahoo Finance para ${benchmark.symbol}...`);
+
+    const apiPrices = await priceService.default.fetchHistoricalPrices(
+      benchmark.symbol,
+      new Date(startDate),
+      new Date(endDate)
+    );
+
+    if (apiPrices && apiPrices.length > 0) {
+      // Convertir formato API a formato de base de datos
+      const prices = apiPrices.map((price) => ({
+        assetId: benchmarkId,
+        date: price.date,
+        open: price.open,
+        high: price.high,
+        low: price.low,
+        close: price.close,
+        volume: price.volume || 0,
+        source: 'yahoo_finance',
+        currency: benchmark.currency,
+      }));
+
+      console.log(`   ✓ Obtenidos ${prices.length} precios reales de Yahoo Finance para ${benchmark.symbol}`);
+
+      if (prices.length > 0) {
+        await PriceHistory.bulkInsertPrices(prices);
+      }
+
+      return prices;
+    }
+
+    // FALLBACK: Generar datos sintéticos si la API falla o no está configurada
+    console.log(`   No se pudieron obtener datos reales, generando sintéticos para ${benchmark.symbol}...`);
 
     // Volatilidades típicas de benchmarks
     const volatilityMap = {
