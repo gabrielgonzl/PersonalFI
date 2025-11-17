@@ -23,6 +23,7 @@ export const calculateSimpleReturn = (currentValue, totalInvested) => {
 /**
  * Calcular TWR (Time-Weighted Return) - Rendimiento ponderado por tiempo
  * Útil cuando hay múltiples aportaciones en diferentes momentos
+ * CORREGIDO: Ahora incluye fees en el cálculo
  * @param {Array} contributions - Array de contribuciones ordenadas por fecha
  * @param {number} currentPrice - Precio actual del activo
  * @returns {number} TWR en porcentaje
@@ -35,7 +36,7 @@ export const calculateTWR = (contributions, currentPrice) => {
 
   // Calcular simple return si solo hay una contribución
   if (sorted.length === 1 && sorted[0].type === 'buy') {
-    const invested = sorted[0].totalAmount;
+    const invested = sorted[0].totalAmount + (sorted[0].fees || 0); // INCLUIR FEES
     const currentValue = sorted[0].quantity * currentPrice;
     return invested > 0 ? Number((((currentValue - invested) / invested) * 100).toFixed(2)) : 0;
   }
@@ -48,10 +49,10 @@ export const calculateTWR = (contributions, currentPrice) => {
   sorted.forEach((contrib) => {
     if (contrib.type === 'buy') {
       totalQuantity += contrib.quantity;
-      totalInvested += contrib.totalAmount;
+      totalInvested += contrib.totalAmount + (contrib.fees || 0); // INCLUIR FEES
     } else if (contrib.type === 'sell') {
       totalQuantity -= contrib.quantity;
-      // No restamos del invested
+      totalInvested -= contrib.fees || 0; // Restar fees de venta del capital invertido
     }
   });
 
@@ -65,6 +66,7 @@ export const calculateTWR = (contributions, currentPrice) => {
  * Calcular MWR (Money-Weighted Return) o IRR (Internal Rate of Return)
  * Considera el timing y tamaño de las aportaciones
  * Aproximación usando Newton-Raphson
+ * CORREGIDO: Ahora incluye fees en el cálculo
  * @param {Array} contributions - Array de contribuciones
  * @param {number} currentValue - Valor actual total
  * @returns {number} MWR/IRR en porcentaje anualizado
@@ -86,7 +88,10 @@ export const calculateMWR = (contributions, currentValue) => {
       const days = differenceInDays(today, new Date(contrib.date));
       const factor = Math.pow(1 + rate, days / 365);
       // Compras son salidas (-), ventas son entradas (+)
-      const cashflow = contrib.type === 'buy' ? -contrib.totalAmount : contrib.totalAmount;
+      // INCLUIR FEES: Los fees se suman al costo de compra o se restan del ingreso de venta
+      const cashflow = contrib.type === 'buy'
+        ? -(contrib.totalAmount + (contrib.fees || 0))  // Compra + fees
+        : (contrib.totalAmount - (contrib.fees || 0));   // Venta - fees
       value += cashflow * factor;
     });
 
@@ -102,7 +107,10 @@ export const calculateMWR = (contributions, currentValue) => {
       const years = days / 365;
       const factor = Math.pow(1 + rate, years - 1);
       // Compras son salidas (-), ventas son entradas (+)
-      const cashflow = contrib.type === 'buy' ? -contrib.totalAmount : contrib.totalAmount;
+      // INCLUIR FEES
+      const cashflow = contrib.type === 'buy'
+        ? -(contrib.totalAmount + (contrib.fees || 0))
+        : (contrib.totalAmount - (contrib.fees || 0));
       value += cashflow * years * factor;
     });
 
@@ -363,6 +371,340 @@ export const calculatePerformanceMetrics = (contributions, currentValue, current
   };
 };
 
+/**
+ * Calcular Maximum Drawdown (máxima caída desde peak histórico)
+ * Métrica crítica de riesgo que muestra la peor pérdida desde un máximo
+ * @param {Array} valueHistory - Array de { date, value }
+ * @returns {object} { maxDrawdown, maxDrawdownPercentage, peakDate, troughDate }
+ */
+export const calculateMaxDrawdown = (valueHistory) => {
+  if (!valueHistory || valueHistory.length < 2) {
+    return {
+      maxDrawdown: 0,
+      maxDrawdownPercentage: 0,
+      peakValue: 0,
+      troughValue: 0,
+      peakDate: null,
+      troughDate: null,
+    };
+  }
+
+  let maxDrawdown = 0;
+  let maxDrawdownPercentage = 0;
+  let peak = valueHistory[0].value;
+  let peakDate = valueHistory[0].date;
+  let troughDate = null;
+  let peakValue = peak;
+  let troughValue = peak;
+
+  for (let i = 1; i < valueHistory.length; i++) {
+    const currentValue = valueHistory[i].value;
+
+    // Actualizar peak si encontramos nuevo máximo
+    if (currentValue > peak) {
+      peak = currentValue;
+      peakDate = valueHistory[i].date;
+    }
+
+    // Calcular drawdown desde el peak
+    const drawdown = peak - currentValue;
+    const drawdownPercentage = peak > 0 ? (drawdown / peak) * 100 : 0;
+
+    // Actualizar máximo drawdown
+    if (drawdownPercentage > maxDrawdownPercentage) {
+      maxDrawdown = drawdown;
+      maxDrawdownPercentage = drawdownPercentage;
+      peakValue = peak;
+      troughValue = currentValue;
+      troughDate = valueHistory[i].date;
+    }
+  }
+
+  return {
+    maxDrawdown: Number(maxDrawdown.toFixed(2)),
+    maxDrawdownPercentage: Number(maxDrawdownPercentage.toFixed(2)),
+    peakValue: Number(peakValue.toFixed(2)),
+    troughValue: Number(troughValue.toFixed(2)),
+    peakDate,
+    troughDate,
+  };
+};
+
+/**
+ * Calcular Value at Risk (VaR) - Pérdida máxima esperada con cierto nivel de confianza
+ * @param {Array} returns - Array de retornos (decimales)
+ * @param {number} confidenceLevel - Nivel de confianza (0.95 = 95%, 0.99 = 99%)
+ * @returns {object} { var, percentile }
+ */
+export const calculateVaR = (returns, confidenceLevel = 0.95) => {
+  if (!returns || returns.length === 0) {
+    return { var: 0, percentile: 0 };
+  }
+
+  // Ordenar retornos de menor a mayor
+  const sortedReturns = [...returns].sort((a, b) => a - b);
+
+  // Encontrar el percentil correspondiente
+  const index = Math.floor((1 - confidenceLevel) * sortedReturns.length);
+  const percentile = sortedReturns[index];
+
+  return {
+    var: Number(Math.abs(percentile).toFixed(4)),
+    percentile: Number((percentile * 100).toFixed(2)),
+    confidenceLevel,
+  };
+};
+
+/**
+ * Calcular Sortino Ratio (similar a Sharpe pero solo considera downside volatility)
+ * @param {number} portfolioReturn - Retorno del portfolio en %
+ * @param {number} riskFreeRate - Tasa libre de riesgo en %
+ * @param {Array} returns - Array de retornos para calcular downside deviation
+ * @returns {number} Sortino Ratio
+ */
+export const calculateSortinoRatio = (portfolioReturn, riskFreeRate, returns) => {
+  if (!returns || returns.length === 0) return 0;
+
+  // Calcular solo la desviación de retornos negativos (downside deviation)
+  const negativeReturns = returns.filter((r) => r < 0);
+
+  if (negativeReturns.length === 0) return Infinity; // No hay pérdidas
+
+  const avgNegativeReturn = negativeReturns.reduce((sum, r) => sum + r, 0) / negativeReturns.length;
+  const squaredDiffs = negativeReturns.map((r) => Math.pow(r - avgNegativeReturn, 2));
+  const downsideVariance = squaredDiffs.reduce((sum, d) => sum + d, 0) / negativeReturns.length;
+  const downsideDeviation = Math.sqrt(downsideVariance);
+
+  // Anualizar
+  const annualizedDownsideDeviation = downsideDeviation * Math.sqrt(252) * 100;
+
+  if (annualizedDownsideDeviation === 0) return 0;
+
+  const excessReturn = portfolioReturn - riskFreeRate;
+  const sortino = excessReturn / annualizedDownsideDeviation;
+
+  return Number(sortino.toFixed(2));
+};
+
+/**
+ * Calcular Calmar Ratio (retorno anualizado / maximum drawdown)
+ * @param {number} annualizedReturn - Retorno anualizado en %
+ * @param {number} maxDrawdownPercentage - Maximum drawdown en %
+ * @returns {number} Calmar Ratio
+ */
+export const calculateCalmarRatio = (annualizedReturn, maxDrawdownPercentage) => {
+  if (maxDrawdownPercentage === 0) return 0;
+  return Number((annualizedReturn / maxDrawdownPercentage).toFixed(2));
+};
+
+/**
+ * Calcular Beta (sensibilidad del portfolio vs benchmark)
+ * @param {Array} portfolioReturns - Retornos del portfolio
+ * @param {Array} benchmarkReturns - Retornos del benchmark
+ * @returns {number} Beta
+ */
+export const calculateBeta = (portfolioReturns, benchmarkReturns) => {
+  if (!portfolioReturns || !benchmarkReturns || portfolioReturns.length === 0 || benchmarkReturns.length === 0) {
+    return 1.0; // Beta neutral por defecto
+  }
+
+  const minLength = Math.min(portfolioReturns.length, benchmarkReturns.length);
+  const portfolioSlice = portfolioReturns.slice(0, minLength);
+  const benchmarkSlice = benchmarkReturns.slice(0, minLength);
+
+  // Calcular promedios
+  const avgPortfolio = portfolioSlice.reduce((sum, r) => sum + r, 0) / minLength;
+  const avgBenchmark = benchmarkSlice.reduce((sum, r) => sum + r, 0) / minLength;
+
+  // Calcular covarianza
+  let covariance = 0;
+  let benchmarkVariance = 0;
+
+  for (let i = 0; i < minLength; i++) {
+    const portfolioDiff = portfolioSlice[i] - avgPortfolio;
+    const benchmarkDiff = benchmarkSlice[i] - avgBenchmark;
+
+    covariance += portfolioDiff * benchmarkDiff;
+    benchmarkVariance += benchmarkDiff * benchmarkDiff;
+  }
+
+  covariance /= minLength;
+  benchmarkVariance /= minLength;
+
+  if (benchmarkVariance === 0) return 1.0;
+
+  const beta = covariance / benchmarkVariance;
+  return Number(beta.toFixed(2));
+};
+
+/**
+ * Calcular Alpha (retorno en exceso ajustado por beta)
+ * @param {number} portfolioReturn - Retorno del portfolio en %
+ * @param {number} riskFreeRate - Tasa libre de riesgo en %
+ * @param {number} benchmarkReturn - Retorno del benchmark en %
+ * @param {number} beta - Beta del portfolio
+ * @returns {number} Alpha en %
+ */
+export const calculateAlpha = (portfolioReturn, riskFreeRate, benchmarkReturn, beta) => {
+  // Fórmula CAPM: Alpha = Portfolio Return - [Risk Free Rate + Beta × (Benchmark Return - Risk Free Rate)]
+  const expectedReturn = riskFreeRate + beta * (benchmarkReturn - riskFreeRate);
+  const alpha = portfolioReturn - expectedReturn;
+
+  return Number(alpha.toFixed(2));
+};
+
+/**
+ * Calcular índice de Herfindahl-Hirschman (HHI) para diversificación
+ * @param {Array} assets - Array de assets con currentValue
+ * @returns {object} { hhi, effectiveAssets, diversificationScore }
+ */
+export const calculateHHI = (assets) => {
+  if (!assets || assets.length === 0) {
+    return { hhi: 1, effectiveAssets: 0, diversificationScore: 0 };
+  }
+
+  const totalValue = assets.reduce((sum, a) => sum + a.currentValue, 0);
+
+  if (totalValue === 0) {
+    return { hhi: 1, effectiveAssets: 0, diversificationScore: 0 };
+  }
+
+  // Calcular HHI = Σ(weight_i)²
+  const hhi = assets.reduce((sum, asset) => {
+    const weight = asset.currentValue / totalValue;
+    return sum + weight * weight;
+  }, 0);
+
+  // Número efectivo de activos (inverso del HHI)
+  const effectiveAssets = 1 / hhi;
+
+  // Score de diversificación (0-100, donde 100 es perfectamente diversificado)
+  // Asumiendo que un portfolio ideal tiene al menos 10 activos equivalentes
+  const idealAssets = 10;
+  const diversificationScore = Math.min(100, (effectiveAssets / idealAssets) * 100);
+
+  return {
+    hhi: Number(hhi.toFixed(4)),
+    effectiveAssets: Number(effectiveAssets.toFixed(2)),
+    diversificationScore: Number(diversificationScore.toFixed(1)),
+  };
+};
+
+/**
+ * Calcular matriz de correlación entre activos
+ * @param {Object} assetReturns - Objeto con { assetId: [returns] }
+ * @returns {Array} Matriz de correlación
+ */
+export const calculateCorrelationMatrix = (assetReturns) => {
+  const assetIds = Object.keys(assetReturns);
+
+  if (assetIds.length < 2) {
+    return [];
+  }
+
+  const matrix = [];
+
+  for (let i = 0; i < assetIds.length; i++) {
+    const row = [];
+    for (let j = 0; j < assetIds.length; j++) {
+      if (i === j) {
+        row.push({ correlation: 1.0, assetId1: assetIds[i], assetId2: assetIds[j] });
+      } else {
+        const correlation = calculateCorrelation(assetReturns[assetIds[i]], assetReturns[assetIds[j]]);
+        row.push({
+          correlation,
+          assetId1: assetIds[i],
+          assetId2: assetIds[j],
+        });
+      }
+    }
+    matrix.push(row);
+  }
+
+  return matrix;
+};
+
+/**
+ * Calcular correlación entre dos series de retornos
+ * @param {Array} returns1 - Retornos del activo 1
+ * @param {Array} returns2 - Retornos del activo 2
+ * @returns {number} Coeficiente de correlación (-1 a 1)
+ */
+export const calculateCorrelation = (returns1, returns2) => {
+  if (!returns1 || !returns2 || returns1.length === 0 || returns2.length === 0) {
+    return 0;
+  }
+
+  const minLength = Math.min(returns1.length, returns2.length);
+  const r1 = returns1.slice(0, minLength);
+  const r2 = returns2.slice(0, minLength);
+
+  const avg1 = r1.reduce((sum, r) => sum + r, 0) / minLength;
+  const avg2 = r2.reduce((sum, r) => sum + r, 0) / minLength;
+
+  let numerator = 0;
+  let sum1Squared = 0;
+  let sum2Squared = 0;
+
+  for (let i = 0; i < minLength; i++) {
+    const diff1 = r1[i] - avg1;
+    const diff2 = r2[i] - avg2;
+
+    numerator += diff1 * diff2;
+    sum1Squared += diff1 * diff1;
+    sum2Squared += diff2 * diff2;
+  }
+
+  const denominator = Math.sqrt(sum1Squared * sum2Squared);
+
+  if (denominator === 0) return 0;
+
+  return Number((numerator / denominator).toFixed(4));
+};
+
+/**
+ * Calcular métricas de riesgo completas
+ * @param {Array} valueHistory - Historial de valores { date, value }
+ * @param {Array} returns - Array de retornos
+ * @param {number} riskFreeRate - Tasa libre de riesgo (default 3%)
+ * @returns {object} Todas las métricas de riesgo
+ */
+export const calculateRiskMetrics = (valueHistory, returns, riskFreeRate = 3) => {
+  if (!returns || returns.length === 0) {
+    return {
+      volatility: 0,
+      maxDrawdown: calculateMaxDrawdown(valueHistory || []),
+      var95: 0,
+      var99: 0,
+      sharpeRatio: 0,
+      sortinoRatio: 0,
+      calmarRatio: 0,
+    };
+  }
+
+  const avgReturn = returns.reduce((sum, r) => sum + r, 0) / returns.length;
+  const annualizedReturn = avgReturn * 252 * 100; // Asumiendo 252 días de trading
+
+  const volatility = calculateVolatility(valueHistory || []);
+  const maxDrawdownData = calculateMaxDrawdown(valueHistory || []);
+  const var95 = calculateVaR(returns, 0.95);
+  const var99 = calculateVaR(returns, 0.99);
+  const sharpeRatio = calculateSharpeRatio(annualizedReturn, riskFreeRate, volatility);
+  const sortinoRatio = calculateSortinoRatio(annualizedReturn, riskFreeRate, returns);
+  const calmarRatio = calculateCalmarRatio(annualizedReturn, maxDrawdownData.maxDrawdownPercentage);
+
+  return {
+    volatility,
+    annualizedReturn: Number(annualizedReturn.toFixed(2)),
+    maxDrawdown: maxDrawdownData,
+    var95,
+    var99,
+    sharpeRatio,
+    sortinoRatio,
+    calmarRatio,
+  };
+};
+
 export default {
   calculateSimpleReturn,
   calculateTWR,
@@ -375,4 +717,14 @@ export default {
   calculateRebalanceNeeds,
   calculateTimeline,
   calculatePerformanceMetrics,
+  calculateMaxDrawdown,
+  calculateVaR,
+  calculateSortinoRatio,
+  calculateCalmarRatio,
+  calculateBeta,
+  calculateAlpha,
+  calculateHHI,
+  calculateCorrelationMatrix,
+  calculateCorrelation,
+  calculateRiskMetrics,
 };

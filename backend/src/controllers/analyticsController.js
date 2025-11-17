@@ -73,6 +73,63 @@ class AnalyticsController {
       next(error);
     }
   }
+
+  /**
+   * GET /analytics/risk-metrics
+   * NUEVO: Obtener métricas de riesgo del portfolio
+   */
+  async getRiskMetrics(req, res, next) {
+    try {
+      const period = req.query.period || '1y';
+
+      const riskMetrics = await analyticsService.getRiskMetrics(period);
+      res.json(successResponse(riskMetrics));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /analytics/benchmark/:symbol
+   * NUEVO: Comparar portfolio con un benchmark específico
+   */
+  async compareWithBenchmark(req, res, next) {
+    try {
+      const { symbol } = req.params;
+      const period = req.query.period || '1y';
+
+      const comparison = await analyticsService.compareWithBenchmark(symbol, period);
+      res.json(successResponse(comparison));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /analytics/benchmarks
+   * NUEVO: Obtener benchmarks disponibles
+   */
+  async getAvailableBenchmarks(req, res, next) {
+    try {
+      const benchmarks = await analyticsService.getAvailableBenchmarks();
+      res.json(successResponse(benchmarks));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /analytics/recommended-benchmark
+   * NUEVO: Obtener benchmark recomendado según assets del portfolio
+   */
+  async getRecommendedBenchmark(req, res, next) {
+    try {
+      const recommended = await analyticsService.getRecommendedBenchmark();
+      res.json(successResponse(recommended));
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export default new AnalyticsController();
