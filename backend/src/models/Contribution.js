@@ -41,7 +41,7 @@ const ContributionSchema = new mongoose.Schema(
     pricePerUnit: {
       type: Number,
       required: [true, 'El precio por unidad es requerido'],
-      min: [0, 'El precio por unidad no puede ser negativo'],
+      min: [0.000001, 'El precio por unidad debe ser mayor a 0'],
     },
     totalAmount: {
       type: Number,

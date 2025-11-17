@@ -30,7 +30,7 @@ const AssetSchema = new mongoose.Schema(
       type: String,
       required: true,
       uppercase: true,
-      default: 'USD',
+      default: 'EUR',
       maxlength: 3,
     },
 

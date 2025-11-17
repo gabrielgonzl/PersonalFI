@@ -43,11 +43,17 @@
 ### 🚀 Características Técnicas
 
 - **Responsive Design**: Funciona perfectamente en móvil, tablet y desktop
-- **Optimistic UI Updates**: Actualizaciones instantáneas con sincronización en segundo plano
+- **Modo Oscuro**: Toggle entre temas claro, oscuro o automático con persistencia local
+- **Lazy Loading**: Carga diferida de componentes para mejor performance
+- **Smart Caching**: React Query con configuración optimizada de caché
+- **Auto-Save**: Guardado automático de formularios con debounce
+- **Export CSV**: Exporta datos de portafolios y transacciones
+- **Retry Logic**: Reintentos automáticos para requests fallidos
+- **Error Boundary**: Manejo elegante de errores con recovery
 - **Real-time Calculations**: Cálculos financieros automáticos y precisos
 - **Modern Stack**: React 18, Node.js/Express, MongoDB Atlas
 - **State Management**: React Query para data fetching eficiente
-- **Type Safety**: (Futuro) TypeScript para mayor robustez
+- **Testing**: Vitest para testing unitario y de integración
 
 ---
 

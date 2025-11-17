@@ -7,7 +7,7 @@ const SettingsSchema = new mongoose.Schema(
     defaultCurrency: {
       type: String,
       uppercase: true,
-      default: 'USD',
+      default: 'EUR',
       maxlength: 3,
     },
     language: {
