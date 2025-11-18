@@ -205,16 +205,14 @@ export const fetchCurrentPrice = async (symbol, type = 'stock') => {
 };
 
 /**
- * Obtener precios históricos usando SteadyAPI
- * OPTIMIZADO: Solo hace llamadas si los datos NO están en MongoDB
- * 
+ * Obtener precios históricos desde SteadyAPI
+ *
  * @param {string} symbol - Símbolo del activo
  * @param {Date} startDate - Fecha de inicio
  * @param {Date} endDate - Fecha de fin
- * @param {string} type - Tipo de activo ('STOCKS', 'ETF', 'MUTUALFUNDS')
  * @returns {Array|null} - Array de precios históricos o null
  */
-export const fetchHistoricalPrices = async (symbol, startDate, endDate, type = 'STOCKS') => {
+export const fetchHistoricalPrices = async (symbol, startDate, endDate) => {
   // Modo manual: retornar null
   if (!isAutoMode()) {
     logger.debug(`Historical prices requested for ${symbol} - MANUAL MODE: returning null`);
@@ -227,29 +225,28 @@ export const fetchHistoricalPrices = async (symbol, startDate, endDate, type = '
   }
 
   try {
-    // Convertir fechas a formato YYYY-MM-DD
-    const formatDate = (date) => {
-      const d = new Date(date);
-      return d.toISOString().split('T')[0];
-    };
+    // Calcular cuántos días necesitamos
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+    
+    // Limitar a 1000 registros (máximo de la API)
+    const limit = Math.min(days, 1000);
 
-    const formattedStartDate = formatDate(startDate);
-    const formattedEndDate = formatDate(endDate);
-
-    // Construir URL con parámetros
-    const url = new URL(`${STEADYAPI_BASE_URL}/v2/markets/stock/historical`);
+    // Construir URL con parámetros - endpoint correcto es /history no /historical
+    const url = new URL(`${STEADYAPI_BASE_URL}/v2/markets/stock/history`);
     url.searchParams.append('ticker', symbol);
-    url.searchParams.append('type', type);
-    url.searchParams.append('from_date', formattedStartDate);
-    url.searchParams.append('to_date', formattedEndDate);
-    url.searchParams.append('limit', '10000'); // Máximo posible
+    url.searchParams.append('interval', '1d'); // Datos diarios
+    url.searchParams.append('limit', limit.toString());
 
-    logger.debug(`Fetching historical data from SteadyAPI: ${symbol} (${formattedStartDate} to ${formattedEndDate})`);
+    logger.debug(
+      `Fetching historical data from SteadyAPI: ${symbol} (${days} days, limit: ${limit})`,
+    );
 
     const response = await axios.get(url.toString(), {
       headers: {
-        'Authorization': `Bearer ${STEADYAPI_KEY}`,
-        'Accept': 'application/json',
+        Authorization: `Bearer ${STEADYAPI_KEY}`,
+        Accept: 'application/json',
       },
       timeout: 30000, // 30 segundos
     });
@@ -261,45 +258,39 @@ export const fetchHistoricalPrices = async (symbol, startDate, endDate, type = '
 
     // Transformar datos de SteadyAPI al formato esperado
     const historicalData = response.data.body.map((item) => {
-      // Parsear fecha (formato: MM/DD/YYYY)
-      const [month, day, year] = item.date.split('/');
-      const date = new Date(`${year}-${month}-${day}`);
-
-      // Limpiar valores (remover comas y convertir a números)
-      const cleanNumber = (str) => {
-        if (!str) return 0;
-        return parseFloat(str.toString().replace(/,/g, ''));
-      };
+      // La respuesta usa timestamp en formato "YYYY-MM-DD HH:MM" o timestamp_unix
+      const date = new Date(item.timestamp);
 
       return {
         date,
-        open: cleanNumber(item.open),
-        high: cleanNumber(item.high),
-        low: cleanNumber(item.low),
-        close: cleanNumber(item.close),
-        volume: cleanNumber(item.volume),
+        open: parseFloat(item.open),
+        high: parseFloat(item.high),
+        low: parseFloat(item.low),
+        close: parseFloat(item.close),
+        volume: parseFloat(item.volume),
       };
-    }).filter((item) => !isNaN(item.close) && item.close > 0);
+    }).filter((item) => !Number.isNaN(item.close) && item.close > 0);
 
-    // Ordenar por fecha ascendente
-    historicalData.sort((a, b) => a.date - b.date);
+    // Filtrar por rango de fechas solicitado y ordenar
+    const filteredData = historicalData
+      .filter((item) => item.date >= start && item.date <= end)
+      .sort((a, b) => a.date - b.date);
 
-    logger.info(`✅ Fetched ${historicalData.length} historical prices from SteadyAPI for ${symbol}`);
+    logger.info(`✅ Fetched ${filteredData.length} historical prices from SteadyAPI for ${symbol}`);
 
-    return historicalData;
-
+    return filteredData;
   } catch (error) {
     if (error.response) {
       logger.error(`SteadyAPI error for ${symbol}:`);
       logger.error(`  Status: ${error.response.status}`);
-      logger.error(`  Data:`, JSON.stringify(error.response.data, null, 2));
+      logger.error('  Data:', JSON.stringify(error.response.data, null, 2));
       logger.error(`  Message: ${error.response.data?.message || error.message}`);
     } else if (error.request) {
       logger.error(`SteadyAPI no response for ${symbol}:`, error.message);
-      logger.error(`  Request was made but no response received`);
+      logger.error('  Request was made but no response received');
     } else {
       logger.error(`Error fetching historical prices for ${symbol}:`, error.message);
-      logger.error(`  Full error:`, error);
+      logger.error('  Full error:', error);
     }
     return null;
   }

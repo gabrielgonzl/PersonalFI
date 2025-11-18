@@ -23,17 +23,16 @@ async function testSteadyAPI() {
   }
 
   try {
-    // Test 1: Simple request para SPY
-    console.log('Test 1: Fetching SPY historical data (last 50 days)...');
-    
-    const url = new URL(`${STEADYAPI_BASE_URL}/v2/markets/stock/historical`);
-    url.searchParams.append('ticker', 'SPY');
-    url.searchParams.append('type', 'STOCKS');
+    // Construir URL con parámetros
+    const url = new URL(`${STEADYAPI_BASE_URL}/v2/markets/stock/history`);
+    url.searchParams.append('ticker', 'AAPL');
+    url.searchParams.append('interval', '1d');
     url.searchParams.append('limit', '50');
 
+    console.log(`Test 1: Fetching AAPL historical data (last 50 days)...`);
     console.log(`  URL: ${url.toString()}`);
     console.log(`  Headers: Authorization: Bearer ${STEADYAPI_KEY.substring(0, 20)}...`);
-    console.log('');
+    console.log();
 
     const response = await axios.get(url.toString(), {
       headers: {
@@ -72,7 +71,11 @@ async function testSteadyAPI() {
     } else if (error.request) {
       console.error('Request Error:');
       console.error('  Request was made but no response received');
+      console.error(`  Error Code: ${error.code || 'N/A'}`);
       console.error(`  Message: ${error.message}`);
+      if (error.cause) {
+        console.error('  Cause:', error.cause);
+      }
     } else {
       console.error('Error:', error.message);
       console.error('Stack:', error.stack);
