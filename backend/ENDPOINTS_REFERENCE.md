@@ -1,13 +1,26 @@
-# Referencia de Endpoints - Yahoo Finance 15 API
+# Referencia de Endpoints - APIs de Datos Financieros
 
-## Configuración Base
-- **Host**: `yahoo-finance15.p.rapidapi.com`
-- **Base URL**: `https://yahoo-finance15.p.rapidapi.com/api`
+Este documento describe todos los endpoints disponibles para obtener datos financieros, divididos entre **RapidAPI** (Yahoo Finance) y **SteadyAPI**.
+
+---
+
+## 📊 RapidAPI - Yahoo Finance (Datos en Tiempo Real)
+
+### Configuración Base
+- **Host**: `yahoo-finance15.p.rapidapi.com` (o `yahoo-finance127.p.rapidapi.com`, `yahoo-finance162.p.rapidapi.com`)
+- **Base URL**: `https://{RAPIDAPI_HOST}/api`
 - **Headers requeridos**:
   - `x-rapidapi-key`: Tu API key
-  - `x-rapidapi-host`: yahoo-finance15.p.rapidapi.com
+  - `x-rapidapi-host`: El host configurado
 
-## Endpoints Implementados en el Backend
+### Modo de Operación
+- Afectado por `PRICE_UPDATE_MODE` (manual/auto)
+- Caché en memoria de 1 minuto para precios actuales
+- Reintentos con backoff exponencial: 2s → 4s → 8s → 16s
+
+---
+
+## Endpoints RapidAPI Implementados en el Backend
 
 ### 1. Cotizaciones en Tiempo Real
 **Endpoint**: `/api/v1/markets/quotes`
@@ -35,7 +48,62 @@
 - **Ejemplo**: `/api/v1/search?query=Apple`
 - **Usado en**: `searchSymbols()` en `priceService.js`
 
-## Endpoints Disponibles (No Implementados Aún)
+---
+
+## 🌐 SteadyAPI - Datos Históricos Extensos
+
+### Configuración Base
+- **Base URL**: `https://api.steadyapi.com`
+- **Headers requeridos**:
+  - `Authorization`: Bearer {STEADYAPI_KEY}
+  - `Accept`: application/json
+
+### Modo de Operación
+- **NO** afectado por `PRICE_UPDATE_MODE` (siempre intenta obtener datos si están configurados)
+- Caché permanente en MongoDB
+- Reintentos con backoff exponencial: 2s → 4s → 8s → 16s
+- Timeout: 30 segundos
+
+---
+
+## Endpoints SteadyAPI Implementados
+
+### 1. Datos Históricos (OHLCV)
+**Endpoint**: `/v2/markets/stock/historical`
+- **Método**: GET
+- **Parámetros**:
+  - `ticker`: Símbolo del activo (ej: 'AAPL', 'SPY')
+  - `type`: Tipo de activo ('STOCKS', 'ETF', 'MUTUALFUNDS')
+  - `from_date`: Fecha inicio (YYYY-MM-DD)
+  - `to_date`: Fecha fin (YYYY-MM-DD)
+  - `limit`: Máximo de registros (ej: 10000)
+- **Ejemplo**: `/v2/markets/stock/historical?ticker=SPY&type=STOCKS&from_date=2015-01-01&to_date=2025-01-01&limit=10000`
+- **Usado en**: `fetchHistoricalPrices()` en `priceService.js`
+- **Respuesta**:
+  ```json
+  {
+    "meta": { "status": 200, "message": "Success" },
+    "body": [
+      {
+        "date": "01/15/2024",
+        "open": "450.25",
+        "high": "455.80",
+        "low": "448.90",
+        "close": "453.40",
+        "volume": "98,234,567"
+      }
+    ]
+  }
+  ```
+- **Características**:
+  - Formato de fecha: MM/DD/YYYY
+  - Números con comas (ej: "98,234,567")
+  - Se transforma internamente a formato estándar
+  - Se cachea en MongoDB con `source: 'steadyapi'`
+
+---
+
+## Endpoints RapidAPI Disponibles (No Implementados Aún)
 
 ### Market Data
 - `/api/v2/markets/tickers` - Lista de tickers del mercado
@@ -92,11 +160,20 @@
 
 ## Variables de Entorno Requeridas
 
+### Para RapidAPI (Yahoo Finance)
 ```env
 RAPIDAPI_KEY=tu_api_key_aqui
 RAPIDAPI_HOST=yahoo-finance15.p.rapidapi.com
-PRICE_UPDATE_MODE=auto  # o 'manual'
+PRICE_UPDATE_MODE=auto  # o 'manual' (solo afecta precios actuales)
 ```
+
+### Para SteadyAPI (Históricos)
+```env
+STEADYAPI_KEY=tu_api_key_aqui
+STEADYAPI_BASE_URL=https://api.steadyapi.com
+```
+
+**Nota**: Las variables de SteadyAPI son independientes del `PRICE_UPDATE_MODE`.
 
 ## Ejemplo de Uso en Código
 
@@ -122,9 +199,17 @@ const info = priceService.getPriceServiceInfo();
 
 ## Testing
 
-Para probar los endpoints sin gastar peticiones de API:
+Para probar los endpoints:
+
+### RapidAPI (Yahoo Finance)
 ```bash
-# Ver los scripts de test disponibles
-node test-working-endpoints.js  # Prueba endpoints confirmados
-node test-all-endpoints.js      # Prueba todos los endpoints documentados
+node test-working-endpoints.js  # Prueba endpoints RapidAPI confirmados
+node test-all-endpoints.js      # Prueba todos los endpoints RapidAPI documentados
 ```
+
+### SteadyAPI (Históricos)
+```bash
+node test-steadyapi.js          # Prueba la conexión a SteadyAPI
+```
+
+**Nota**: Los tests de SteadyAPI consumirán créditos de API. Úsalos solo cuando sea necesario.

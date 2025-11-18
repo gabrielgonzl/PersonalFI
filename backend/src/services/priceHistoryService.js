@@ -3,6 +3,7 @@
  */
 import { PriceHistory, Asset, Contribution } from '../models/index.js';
 import { subDays, subMonths, eachDayOfInterval, startOfDay } from 'date-fns';
+import logger from '../config/logger.js';
 
 class PriceHistoryService {
   /**
@@ -24,7 +25,7 @@ class PriceHistoryService {
     const contributions = await Contribution.find({ assetId }).sort({ date: 1 });
 
     if (contributions.length === 0) {
-      console.log(`No contributions found for asset ${assetId}`);
+      logger.warn(`No contributions found for asset ${assetId}`);
       return [];
     }
 
@@ -42,8 +43,8 @@ class PriceHistoryService {
     const coveragePercentage = (existingPricesCount / expectedDays) * 100;
 
     if (coveragePercentage > 80) {
-      console.log(`   ✅ Ya existen ${existingPricesCount} precios REALES en MongoDB para ${asset.symbol} (${coveragePercentage.toFixed(0)}% cobertura)`);
-      console.log(`   ⏭️  Saltando llamada a API (usando datos existentes)`);
+      logger.info(`✅ Ya existen ${existingPricesCount} precios REALES en MongoDB para ${asset.symbol} (${coveragePercentage.toFixed(0)}% cobertura)`);
+      logger.info(`⏭️  Saltando llamada a API (usando datos existentes)`);
       
       // Retornar datos existentes
       const existingPrices = await PriceHistory.find({
@@ -65,9 +66,9 @@ class PriceHistoryService {
     }
 
     // ========== PASO 2: INTENTAR OBTENER DATOS REALES DE STEADYAPI ==========
-    console.log(`   🔍 Obteniendo datos REALES de SteadyAPI para ${asset.symbol}...`);
+    logger.info(`🔍 Obteniendo datos REALES de SteadyAPI para ${asset.symbol}...`);
     const priceService = await import('../utils/priceService.js');
-    
+
     try {
       // Determinar tipo de asset para SteadyAPI
       const assetTypeMap = {
@@ -98,98 +99,28 @@ class PriceHistoryService {
           currency: asset.currency,
         }));
 
-        console.log(`   ✅ Obtenidos ${prices.length} precios REALES de SteadyAPI para ${asset.symbol}`);
-        console.log(`   💾 Guardando en MongoDB para reutilizar...`);
-        
+        logger.info(`✅ Obtenidos ${prices.length} precios REALES de SteadyAPI para ${asset.symbol}`);
+        logger.info(`💾 Guardando en MongoDB para reutilizar...`);
+
         return prices;
+      } else {
+        logger.warn(`⚠️  SteadyAPI no retornó datos para ${asset.symbol}`);
+        return [];
       }
     } catch (error) {
-      console.log(`   ⚠️  Error al obtener datos de SteadyAPI: ${error.message}`);
+      logger.error(`❌ Error al obtener datos de SteadyAPI para ${asset.symbol}: ${error.message}`);
+      return [];
     }
 
-    // ========== PASO 3: FALLBACK A DATOS SINTÉTICOS ==========
-    console.log(`   📊 Generando precios sintéticos para ${asset.symbol} (API no disponible)...`);
-    const prices = [];
-
-    // Generar precios diarios usando interpolación y volatilidad sintética
-    const allDays = eachDayOfInterval({ start: firstDate, end: lastDate });
-
-    let lastKnownPrice = contributions[0].pricePerUnit;
-    let nextContributionIndex = 1;
-
-    for (const day of allDays) {
-      // Buscar si hay una contribución en este día
-      const contribution = contributions.find(
-        (c) => startOfDay(new Date(c.date)).getTime() === startOfDay(day).getTime()
-      );
-
-      if (contribution) {
-        // Usar el precio real de la contribución
-        lastKnownPrice = contribution.pricePerUnit;
-        prices.push({
-          assetId,
-          date: startOfDay(day),
-          open: lastKnownPrice * 0.995, // Simulación de variación intraday
-          high: lastKnownPrice * 1.01,
-          low: lastKnownPrice * 0.99,
-          close: lastKnownPrice,
-          volume: contribution.quantity,
-          source: 'synthetic',
-          currency: asset.currency,
-        });
-      } else {
-        // Generar precio sintético con volatilidad realista
-        // Volatilidad diaria típica: 0.5% - 2% para activos tradicionales
-        const volatility = this.getVolatilityForAssetType(asset.type);
-        const randomChange = (Math.random() - 0.5) * 2 * volatility;
-        const newPrice = lastKnownPrice * (1 + randomChange);
-
-        prices.push({
-          assetId,
-          date: startOfDay(day),
-          open: lastKnownPrice,
-          high: Math.max(lastKnownPrice, newPrice) * 1.005,
-          low: Math.min(lastKnownPrice, newPrice) * 0.995,
-          close: newPrice,
-          volume: 0,
-          source: 'synthetic',
-          currency: asset.currency,
-        });
-
-        lastKnownPrice = newPrice;
-      }
-    }
-
-    // Ajustar el último precio al precio actual real
-    if (prices.length > 0) {
-      const lastPrice = prices[prices.length - 1];
-      lastPrice.close = asset.currentPrice;
-      lastPrice.high = Math.max(lastPrice.high, asset.currentPrice);
-      lastPrice.low = Math.min(lastPrice.low, asset.currentPrice);
-    }
-
-    return prices;
+    // DATOS SINTÉTICOS ELIMINADOS - Solo usamos datos reales de SteadyAPI o datos existentes en MongoDB
   }
 
   /**
-   * Obtener volatilidad típica por tipo de activo
+   * ELIMINADO: getVolatilityForAssetType() - No se generan más datos sintéticos
    */
-  getVolatilityForAssetType(type) {
-    const volatilityMap = {
-      crypto: 0.03, // 3% diario
-      stock: 0.015, // 1.5% diario
-      etf: 0.01, // 1% diario
-      fund: 0.008, // 0.8% diario
-      bond: 0.005, // 0.5% diario
-      commodity: 0.02, // 2% diario
-      real_estate: 0.003, // 0.3% diario
-    };
-
-    return volatilityMap[type] || 0.01;
-  }
 
   /**
-   * Poblar base de datos con precios históricos sintéticos para todos los assets
+   * Poblar base de datos con precios históricos REALES para todos los assets
    */
   async populateAllAssets() {
     const assets = await Asset.find();
@@ -197,7 +128,7 @@ class PriceHistoryService {
 
     for (const asset of assets) {
       try {
-        console.log(`Generating price history for ${asset.name} (${asset.symbol})...`);
+        logger.info(`Fetching price history for ${asset.name} (${asset.symbol})...`);
         const prices = await this.generateSyntheticPriceHistory(asset._id);
 
         if (prices.length > 0) {
@@ -208,10 +139,19 @@ class PriceHistoryService {
             pricesGenerated: prices.length,
             success: true,
           });
-          console.log(`✓ Generated ${prices.length} price points for ${asset.name}`);
+          logger.info(`✓ Fetched ${prices.length} price points for ${asset.name}`);
+        } else {
+          logger.warn(`⚠️  No price data available for ${asset.name} (${asset.symbol})`);
+          results.push({
+            assetId: asset._id,
+            name: asset.name,
+            pricesGenerated: 0,
+            success: false,
+            error: 'No data available from API',
+          });
         }
       } catch (error) {
-        console.error(`✗ Error generating prices for ${asset.name}:`, error.message);
+        logger.error(`✗ Error fetching prices for ${asset.name}: ${error.message}`);
         results.push({
           assetId: asset._id,
           name: asset.name,
@@ -232,11 +172,14 @@ class PriceHistoryService {
     const count = await PriceHistory.countDocuments({ assetId });
 
     if (count === 0) {
-      // Generar precios sintéticos si no existen
-      console.log(`No price history found for asset ${assetId}, generating synthetic data...`);
+      // Intentar obtener datos de la API si no existen
+      logger.info(`No price history found for asset ${assetId}, fetching from API...`);
       const prices = await this.generateSyntheticPriceHistory(assetId);
       if (prices.length > 0) {
         await PriceHistory.bulkInsertPrices(prices);
+      } else {
+        logger.warn(`⚠️  No price data available for asset ${assetId}`);
+        return [];
       }
     }
 
@@ -255,9 +198,12 @@ class PriceHistoryService {
     let price = await PriceHistory.getPriceAtDate(assetId, date);
 
     if (!price) {
-      // Si no existe, generar historial sintético
-      await this.generateSyntheticPriceHistory(assetId);
-      price = await PriceHistory.getPriceAtDate(assetId, date);
+      // Si no existe, intentar obtener de la API
+      const prices = await this.generateSyntheticPriceHistory(assetId);
+      if (prices.length > 0) {
+        await PriceHistory.bulkInsertPrices(prices);
+        price = await PriceHistory.getPriceAtDate(assetId, date);
+      }
     }
 
     return price;
@@ -314,11 +260,11 @@ class PriceHistoryService {
   }
 
   /**
-   * Limpiar historial de precios sintéticos (útil para testing)
+   * ELIMINADO: clearSyntheticPrices() - No se generan más datos sintéticos
+   *
+   * Para limpiar todos los precios históricos, usar:
+   * await PriceHistory.deleteMany({ assetId });
    */
-  async clearSyntheticPrices() {
-    return PriceHistory.deleteMany({ source: 'synthetic' });
-  }
 
   /**
    * Obtener estadísticas de precios históricos

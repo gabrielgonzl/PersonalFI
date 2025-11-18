@@ -218,7 +218,10 @@ export const fetchHistoricalPrices = async (symbol, startDate, endDate) => {
     logger.debug(`Historical prices requested for ${symbol} - MANUAL MODE: returning null`);
     return null;
   }
+};
 
+export const fetchHistoricalPrices = async (symbol, startDate, endDate, type = 'STOCKS') => {
+  // Verificar que SteadyAPI esté configurado
   if (!STEADYAPI_KEY || STEADYAPI_KEY === 'your_steadyapi_key_here') {
     logger.warn(`SteadyAPI key not configured - cannot fetch historical prices for ${symbol}`);
     return null;
@@ -280,6 +283,12 @@ export const fetchHistoricalPrices = async (symbol, startDate, endDate) => {
 
     return filteredData;
   } catch (error) {
+    const statusCode = error.response?.status || 'N/A';
+    const errorData = error.response?.data;
+    const errorMessage = error.response?.data?.message || error.message;
+
+    logger.error(`❌ SteadyAPI fetch error for ${symbol} [${statusCode}]: ${errorMessage}`);
+
     if (error.response) {
       logger.error(`SteadyAPI error for ${symbol}:`);
       logger.error(`  Status: ${error.response.status}`);
@@ -292,6 +301,7 @@ export const fetchHistoricalPrices = async (symbol, startDate, endDate) => {
       logger.error(`Error fetching historical prices for ${symbol}:`, error.message);
       logger.error('  Full error:', error);
     }
+
     return null;
   }
 

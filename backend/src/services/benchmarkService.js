@@ -3,6 +3,7 @@
  */
 import { Benchmark, PriceHistory, Asset } from '../models/index.js';
 import priceHistoryService from './priceHistoryService.js';
+import logger from '../config/logger.js';
 import {
   calculateBeta,
   calculateAlpha,
@@ -105,10 +106,10 @@ class BenchmarkService {
       date: { $gte: startDate, $lte: endDate },
     }).sort({ date: 1 });
 
-    // Si no hay datos históricos, generar sintéticos o retornar vacío
+    // Si no hay datos históricos, intentar obtener de la API
     if (benchmarkPrices.length === 0) {
-      console.log(`No price history for benchmark ${benchmarkSymbol}, generating synthetic data...`);
-      // Generar precios sintéticos para el benchmark
+      logger.warn(`⚠️  No price history for benchmark ${benchmarkSymbol}, fetching from API...`);
+      // Intentar obtener precios de la API
       await this.generateSyntheticBenchmarkPrices(benchmark._id, startDate, endDate);
 
       // Reintentamos obtener los precios
@@ -118,6 +119,7 @@ class BenchmarkService {
       }).sort({ date: 1 });
 
       if (retryPrices.length === 0) {
+        logger.warn(`⚠️  No price data available for benchmark ${benchmarkSymbol}`);
         return {
           benchmark: benchmark.name,
           symbol: benchmarkSymbol,
@@ -154,13 +156,13 @@ class BenchmarkService {
   }
 
   /**
-   * Generar precios para benchmark - OPTIMIZADO para minimizar llamadas a API
-   * 
+   * Obtener precios para benchmark - OPTIMIZADO para minimizar llamadas a API
+   *
    * ESTRATEGIA:
    * 1. Verificar si ya existen datos históricos en MongoDB
    * 2. Solo llamar a SteadyAPI si NO hay datos o están incompletos
    * 3. Guardar datos obtenidos en MongoDB para reutilizarlos
-   * 4. Fallback a datos sintéticos solo si la API falla
+   * 4. Retornar vacío si la API falla (NO generar datos sintéticos)
    */
   async generateSyntheticBenchmarkPrices(benchmarkId, startDate, endDate) {
     const benchmark = await Benchmark.findById(benchmarkId);
@@ -181,8 +183,8 @@ class BenchmarkService {
     const coveragePercentage = (existingPricesCount / expectedDays) * 100;
 
     if (coveragePercentage > 80) {
-      console.log(`   ✅ Ya existen ${existingPricesCount} precios REALES en MongoDB para ${benchmark.symbol}`);
-      console.log(`   ⏭️  Saltando llamada a API (${coveragePercentage.toFixed(0)}% cobertura)`);
+      logger.info(`✅ Ya existen ${existingPricesCount} precios REALES en MongoDB para ${benchmark.symbol}`);
+      logger.info(`⏭️  Saltando llamada a API (${coveragePercentage.toFixed(0)}% cobertura)`);
       
       // Retornar datos existentes
       const existingPrices = await PriceHistory.find({
@@ -204,9 +206,9 @@ class BenchmarkService {
     }
 
     // ========== PASO 2: INTENTAR OBTENER DATOS REALES DE STEADYAPI ==========
-    console.log(`   🔍 Obteniendo datos REALES de SteadyAPI para benchmark ${benchmark.symbol}...`);
+    logger.info(`🔍 Obteniendo datos REALES de SteadyAPI para benchmark ${benchmark.symbol}...`);
     const priceService = await import('../utils/priceService.js');
-    
+
     try {
       // Los benchmarks suelen ser ETFs o índices (generalmente tipo STOCKS o ETF)
       const steadyType = benchmark.category === 'crypto' ? 'STOCKS' : 'STOCKS'; // SteadyAPI solo tiene STOCKS, ETF, MUTUALFUNDS
@@ -231,80 +233,24 @@ class BenchmarkService {
           currency: benchmark.currency,
         }));
 
-        console.log(`   ✅ Obtenidos ${prices.length} precios REALES de SteadyAPI para ${benchmark.symbol}`);
-        console.log(`   💾 Guardando en MongoDB...`);
+        logger.info(`✅ Obtenidos ${prices.length} precios REALES de SteadyAPI para ${benchmark.symbol}`);
+        logger.info(`💾 Guardando en MongoDB...`);
 
         if (prices.length > 0) {
           await PriceHistory.bulkInsertPrices(prices);
         }
 
         return prices;
+      } else {
+        logger.warn(`⚠️  SteadyAPI no retornó datos para ${benchmark.symbol}`);
+        return [];
       }
     } catch (error) {
-      console.log(`   ⚠️  Error al obtener datos de SteadyAPI: ${error.message}`);
+      logger.error(`❌ Error al obtener datos de SteadyAPI para ${benchmark.symbol}: ${error.message}`);
+      return [];
     }
 
-    // ========== PASO 3: FALLBACK A DATOS SINTÉTICOS ==========
-    console.log(`   📊 Generando precios sintéticos para ${benchmark.symbol} (API no disponible)...`);
-
-    // Volatilidades típicas de benchmarks
-    const volatilityMap = {
-      SPY: 0.01, // 1% diario
-      SX5E: 0.012, // 1.2% diario
-      URTH: 0.01, // 1% diario
-      BTC: 0.03, // 3% diario
-      ETH: 0.035, // 3.5% diario
-    };
-
-    const volatility = volatilityMap[benchmark.symbol] || 0.01;
-
-    // Precio inicial (típico para cada índice)
-    const initialPriceMap = {
-      SPY: 450,
-      SX5E: 4200,
-      URTH: 120,
-      BTC: 40000,
-      ETH: 2500,
-    };
-
-    let currentPrice = initialPriceMap[benchmark.symbol] || 100;
-
-    const prices = [];
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      // Random walk con drift positivo (mercados tienden a subir en el largo plazo)
-      const drift = 0.0003; // ~7.5% anual
-      const randomChange = (Math.random() - 0.5) * 2 * volatility;
-      const change = drift + randomChange;
-
-      const open = currentPrice;
-      const newPrice = currentPrice * (1 + change);
-      const high = Math.max(open, newPrice) * 1.005;
-      const low = Math.min(open, newPrice) * 0.995;
-
-      prices.push({
-        assetId: benchmarkId,
-        date: new Date(d),
-        open,
-        high,
-        low,
-        close: newPrice,
-        volume: 0,
-        source: 'synthetic',  // Marcar como sintético
-        currency: benchmark.currency,
-      });
-
-      currentPrice = newPrice;
-    }
-
-    if (prices.length > 0) {
-      await PriceHistory.bulkInsertPrices(prices);
-    }
-
-    console.log(`   📊 Generados ${prices.length} precios sintéticos para ${benchmark.symbol}`);
-    return prices;
+    // DATOS SINTÉTICOS ELIMINADOS - Solo usamos datos reales de SteadyAPI o datos existentes en MongoDB
   }
 
   /**
