@@ -210,16 +210,9 @@ export const fetchCurrentPrice = async (symbol, type = 'stock') => {
  * @param {string} symbol - Símbolo del activo
  * @param {Date} startDate - Fecha de inicio
  * @param {Date} endDate - Fecha de fin
+ * @param {string} type - Tipo de activo ('STOCKS', 'ETF', 'MUTUALFUNDS')
  * @returns {Array|null} - Array de precios históricos o null
  */
-export const fetchHistoricalPrices = async (symbol, startDate, endDate) => {
-  // Modo manual: retornar null
-  if (!isAutoMode()) {
-    logger.debug(`Historical prices requested for ${symbol} - MANUAL MODE: returning null`);
-    return null;
-  }
-};
-
 export const fetchHistoricalPrices = async (symbol, startDate, endDate, type = 'STOCKS') => {
   // Verificar que SteadyAPI esté configurado
   if (!STEADYAPI_KEY || STEADYAPI_KEY === 'your_steadyapi_key_here') {

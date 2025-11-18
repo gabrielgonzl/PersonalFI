@@ -102,6 +102,10 @@ class PriceHistoryService {
         logger.info(`✅ Obtenidos ${prices.length} precios REALES de SteadyAPI para ${asset.symbol}`);
         logger.info(`💾 Guardando en MongoDB para reutilizar...`);
 
+        // CRÍTICO: Guardar en MongoDB antes de retornar
+        await PriceHistory.bulkInsertPrices(prices);
+        logger.info(`✅ Guardados ${prices.length} precios en MongoDB`);
+
         return prices;
       } else {
         logger.warn(`⚠️  SteadyAPI no retornó datos para ${asset.symbol}`);
