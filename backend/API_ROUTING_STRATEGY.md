@@ -117,10 +117,11 @@ const history = await priceService.fetchHistoricalPrices(
 );
 ```
 
-**Estrategia de Caché (3 pasos)**:
+**Estrategia de Caché (2 pasos)**:
 1. **Verificar MongoDB** → Si existe 80%+ de datos, usar caché
 2. **Llamar SteadyAPI** → Solo si faltan datos
-3. **Fallback a sintéticos** → Solo si SteadyAPI falla
+
+**NOTA**: Ya no se generan datos sintéticos. Solo se usan datos reales.
 
 **Características**:
 - Caché permanente en MongoDB

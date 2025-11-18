@@ -22,7 +22,7 @@
 
 ---
 
-## 🔄 Estrategia de Caché en 3 Pasos
+## 🔄 Estrategia de Caché en 2 Pasos
 
 ### **PASO 1: Verificar MongoDB**
 Antes de llamar a la API, verificamos si ya tenemos los datos:
@@ -37,7 +37,7 @@ const existingPricesCount = await PriceHistory.countDocuments({
 const coveragePercentage = (existingPricesCount / expectedDays) * 100;
 
 if (coveragePercentage > 80) {
-  console.log('✅ Ya tenemos datos en MongoDB - Usando caché');
+  logger.info('✅ Ya tenemos datos en MongoDB - Usando caché');
   return existingPrices; // ← NO llamar a la API
 }
 ```
@@ -58,28 +58,21 @@ const apiPrices = await priceService.fetchHistoricalPrices(
 );
 
 if (apiPrices && apiPrices.length > 0) {
-  console.log(`✅ Obtenidos ${apiPrices.length} precios de SteadyAPI`);
-  
+  logger.info(`✅ Obtenidos ${apiPrices.length} precios de SteadyAPI`);
+
   // Guardar en MongoDB para reutilizar
   await PriceHistory.bulkInsertPrices(prices);
-  
+
   return prices;
+} else {
+  logger.warn('⚠️  SteadyAPI no retornó datos');
+  return []; // NO generar datos sintéticos
 }
 ```
 
-**Resultado**: Datos guardados en MongoDB con `source: 'steadyapi'`.
+**Resultado**: Datos guardados en MongoDB con `source: 'steadyapi'` o array vacío si no hay datos disponibles.
 
----
-
-### **PASO 3: Fallback a Datos Sintéticos**
-Solo si la API falla o no está configurada:
-
-```javascript
-console.log('📊 Generando datos sintéticos (API no disponible)');
-// Generar datos basados en contribuciones + volatilidad
-```
-
-**Resultado**: Datos guardados en MongoDB con `source: 'synthetic'`.
+**NOTA**: **Ya no se generan datos sintéticos**. Solo se usan datos reales de la API o datos existentes en MongoDB.
 
 ---
 
@@ -112,7 +105,7 @@ console.log('📊 Generando datos sintéticos (API no disponible)');
 | `yahoo_finance` | Datos reales de Yahoo Finance | ⭐⭐⭐⭐⭐ | 100% |
 | `api` | Datos reales de cualquier API | ⭐⭐⭐⭐⭐ | 100% |
 | `manual` | Datos ingresados manualmente | ⭐⭐⭐⭐ | 90% |
-| `synthetic` | Datos generados algorítmicamente | ⭐⭐ | 50% |
+| ~~`synthetic`~~ | ~~Datos generados algorítmicamente~~ | ❌ ELIMINADO | No se genera más |
 
 ---
 
@@ -181,6 +174,28 @@ Verificar MongoDB → 756 registros antiguos (65% cobertura)
 ```
 
 **Llamadas a API**: 1 (solo para actualizar)
+
+---
+
+### Caso 4: **API no disponible o sin datos**
+
+```
+Usuario ejecuta seeder
+    ↓
+priceHistoryService.generateSyntheticPriceHistory()
+    ↓
+Verificar MongoDB → 0 registros (0% cobertura)
+    ↓
+🔍 Llamar a SteadyAPI
+    ↓
+❌ API falla o no retorna datos
+    ↓
+⚠️  Retornar array vacío
+    ↓
+⚠️  Sin datos disponibles para análisis
+```
+
+**Resultado**: Sin datos históricos. El asset no podrá mostrar gráficos hasta que la API esté disponible.
 
 ---
 

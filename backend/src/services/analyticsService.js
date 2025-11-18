@@ -2,6 +2,7 @@
  * Servicio de analytics y métricas financieras
  * ACTUALIZADO: Ahora usa precios históricos reales
  */
+import logger from '../config/logger.js';
 
 import { Asset, Portfolio, Contribution, PriceHistory } from '../models/index.js';
 import {
@@ -104,12 +105,15 @@ class AnalyticsService {
     // Obtener todos los assets
     const assets = await Asset.find();
 
-    // NUEVO: Asegurar que existan precios históricos para todos los assets
+    // Asegurar que existan precios históricos para todos los assets
     for (const asset of assets) {
       const priceCount = await PriceHistory.countDocuments({ assetId: asset._id });
       if (priceCount === 0) {
-        console.log(`Generating price history for asset ${asset.name}...`);
-        await priceHistoryService.generateSyntheticPriceHistory(asset._id);
+        logger.warn(`⚠️  No price history found for asset ${asset.name}, fetching from API...`);
+        const prices = await priceHistoryService.generateSyntheticPriceHistory(asset._id);
+        if (prices.length === 0) {
+          logger.warn(`⚠️  No price data available for ${asset.name} (${asset.symbol})`);
+        }
       }
     }
 
