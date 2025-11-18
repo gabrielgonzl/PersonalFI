@@ -156,13 +156,18 @@ class BenchmarkService {
   }
 
   /**
-   * Obtener precios para benchmark - OPTIMIZADO para minimizar llamadas a API
+   * Obtener precios REALES para benchmark desde API - OPTIMIZADO para minimizar llamadas
    *
    * ESTRATEGIA:
    * 1. Verificar si ya existen datos históricos en MongoDB
    * 2. Solo llamar a SteadyAPI si NO hay datos o están incompletos
    * 3. Guardar datos obtenidos en MongoDB para reutilizarlos
-   * 4. Retornar vacío si la API falla (NO generar datos sintéticos)
+   * 4. Si la API falla o no retorna datos: retornar array vacío (NO se generan datos sintéticos)
+   *
+   * @param {ObjectId} benchmarkId - ID del benchmark
+   * @param {Date} startDate - Fecha de inicio
+   * @param {Date} endDate - Fecha de fin
+   * @returns {Array} Array de precios reales o array vacío si no hay datos disponibles
    */
   async generateSyntheticBenchmarkPrices(benchmarkId, startDate, endDate) {
     const benchmark = await Benchmark.findById(benchmarkId);
@@ -247,10 +252,11 @@ class BenchmarkService {
       }
     } catch (error) {
       logger.error(`❌ Error al obtener datos de SteadyAPI para ${benchmark.symbol}: ${error.message}`);
-      return [];
+      return []; // Retornar vacío - NO se generan datos sintéticos
     }
 
-    // DATOS SINTÉTICOS ELIMINADOS - Solo usamos datos reales de SteadyAPI o datos existentes en MongoDB
+    // NOTA: Esta función NUNCA genera datos sintéticos
+    // Solo retorna: datos en caché de MongoDB O datos reales de SteadyAPI O array vacío
   }
 
   /**

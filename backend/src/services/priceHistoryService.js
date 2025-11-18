@@ -7,13 +7,16 @@ import logger from '../config/logger.js';
 
 class PriceHistoryService {
   /**
-   * Generar historial de precios - OPTIMIZADO para minimizar llamadas a API
-   * 
+   * Obtener historial de precios REALES desde API - OPTIMIZADO para minimizar llamadas
+   *
    * ESTRATEGIA:
    * 1. Verificar si ya existen datos históricos en MongoDB
    * 2. Solo llamar a SteadyAPI si NO hay datos o están incompletos
    * 3. Guardar datos obtenidos en MongoDB para reutilizarlos
-   * 4. Fallback a datos sintéticos solo si la API falla
+   * 4. Si la API falla o no retorna datos: retornar array vacío (NO se generan datos sintéticos)
+   *
+   * @param {ObjectId} assetId - ID del asset
+   * @returns {Array} Array de precios reales o array vacío si no hay datos disponibles
    */
   async generateSyntheticPriceHistory(assetId) {
     const asset = await Asset.findById(assetId);
@@ -113,15 +116,12 @@ class PriceHistoryService {
       }
     } catch (error) {
       logger.error(`❌ Error al obtener datos de SteadyAPI para ${asset.symbol}: ${error.message}`);
-      return [];
+      return []; // Retornar vacío - NO se generan datos sintéticos
     }
 
-    // DATOS SINTÉTICOS ELIMINADOS - Solo usamos datos reales de SteadyAPI o datos existentes en MongoDB
+    // NOTA: Esta función NUNCA genera datos sintéticos
+    // Solo retorna: datos en caché de MongoDB O datos reales de SteadyAPI O array vacío
   }
-
-  /**
-   * ELIMINADO: getVolatilityForAssetType() - No se generan más datos sintéticos
-   */
 
   /**
    * Poblar base de datos con precios históricos REALES para todos los assets
