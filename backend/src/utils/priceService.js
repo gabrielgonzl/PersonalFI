@@ -207,20 +207,55 @@ export const fetchCurrentPrice = async (symbol, type = 'stock') => {
 /**
  * Obtener precios históricos usando SteadyAPI
  * OPTIMIZADO: Solo hace llamadas si los datos NO están en MongoDB
- * 
+ *
+ * NOTA: Los históricos NO se ven afectados por PRICE_UPDATE_MODE (manual/auto)
+ * porque se obtienen una sola vez y se cachean en MongoDB. El modo manual/auto
+ * solo aplica a precios actuales en tiempo real.
+ *
  * @param {string} symbol - Símbolo del activo
  * @param {Date} startDate - Fecha de inicio
  * @param {Date} endDate - Fecha de fin
  * @param {string} type - Tipo de activo ('STOCKS', 'ETF', 'MUTUALFUNDS')
  * @returns {Array|null} - Array de precios históricos o null
  */
-export const fetchHistoricalPrices = async (symbol, startDate, endDate, type = 'STOCKS') => {
-  // Modo manual: retornar null
-  if (!isAutoMode()) {
-    logger.debug(`Historical prices requested for ${symbol} - MANUAL MODE: returning null`);
-    return null;
-  }
+/**
+ * Hacer petición a SteadyAPI con reintentos y backoff exponencial
+ */
+const fetchFromSteadyAPI = async (url, symbol, retryCount = 0) => {
+  logger.debug(`Fetching from SteadyAPI: ${symbol} (attempt ${retryCount + 1}/${MAX_RETRIES + 1})`);
 
+  try {
+    const response = await axios.get(url, {
+      headers: {
+        'Authorization': `Bearer ${STEADYAPI_KEY}`,
+        'Accept': 'application/json',
+      },
+      timeout: 30000, // 30 segundos
+    });
+
+    return response;
+  } catch (error) {
+    const isNetworkError = error.code === 'ECONNABORTED' ||
+                          error.code === 'ETIMEDOUT' ||
+                          error.code === 'ENOTFOUND' ||
+                          error.response?.status >= 500;
+
+    // Reintentar solo si es un error de red/servidor y no hemos excedido los reintentos
+    if (isNetworkError && retryCount < MAX_RETRIES) {
+      const delay = INITIAL_RETRY_DELAY * Math.pow(2, retryCount); // Backoff exponencial: 2s, 4s, 8s, 16s
+      logger.warn(`Network error for ${symbol}, retrying in ${delay}ms... (${retryCount + 1}/${MAX_RETRIES})`);
+
+      await sleep(delay);
+      return fetchFromSteadyAPI(url, symbol, retryCount + 1);
+    }
+
+    // Si no es un error de red o ya agotamos los reintentos, lanzar el error
+    throw error;
+  }
+};
+
+export const fetchHistoricalPrices = async (symbol, startDate, endDate, type = 'STOCKS') => {
+  // Verificar que SteadyAPI esté configurado
   if (!STEADYAPI_KEY || STEADYAPI_KEY === 'your_steadyapi_key_here') {
     logger.warn(`SteadyAPI key not configured - cannot fetch historical prices for ${symbol}`);
     return null;
@@ -245,14 +280,9 @@ export const fetchHistoricalPrices = async (symbol, startDate, endDate, type = '
     url.searchParams.append('limit', '10000'); // Máximo posible
 
     logger.debug(`Fetching historical data from SteadyAPI: ${symbol} (${formattedStartDate} to ${formattedEndDate})`);
+    logger.debug(`URL: ${url.toString()}`);
 
-    const response = await axios.get(url.toString(), {
-      headers: {
-        'Authorization': `Bearer ${STEADYAPI_KEY}`,
-        'Accept': 'application/json',
-      },
-      timeout: 30000, // 30 segundos
-    });
+    const response = await fetchFromSteadyAPI(url.toString(), symbol);
 
     if (!response.data || !response.data.body || !Array.isArray(response.data.body)) {
       logger.warn(`No historical data found for ${symbol} in SteadyAPI response`);
@@ -289,18 +319,27 @@ export const fetchHistoricalPrices = async (symbol, startDate, endDate, type = '
     return historicalData;
 
   } catch (error) {
+    const statusCode = error.response?.status || 'N/A';
+    const errorData = error.response?.data;
+    const errorMessage = error.response?.data?.message || error.message;
+
+    logger.error(`❌ SteadyAPI fetch error for ${symbol} [${statusCode}]: ${errorMessage}`);
+
     if (error.response) {
-      logger.error(`SteadyAPI error for ${symbol}:`);
-      logger.error(`  Status: ${error.response.status}`);
-      logger.error(`  Data:`, JSON.stringify(error.response.data, null, 2));
-      logger.error(`  Message: ${error.response.data?.message || error.message}`);
+      logger.error(`  Status: ${error.response.status} ${error.response.statusText}`);
+      logger.error(`  URL: ${error.config?.url}`);
+      if (errorData && typeof errorData === 'object') {
+        logger.error(`  Response data:`, JSON.stringify(errorData, null, 2));
+      }
     } else if (error.request) {
-      logger.error(`SteadyAPI no response for ${symbol}:`, error.message);
-      logger.error(`  Request was made but no response received`);
+      logger.error(`  No response received from SteadyAPI`);
+      logger.error(`  URL: ${error.config?.url}`);
+      logger.error(`  Error code: ${error.code}`);
     } else {
-      logger.error(`Error fetching historical prices for ${symbol}:`, error.message);
-      logger.error(`  Full error:`, error);
+      logger.error(`  Error: ${error.message}`);
+      logger.error(`  Stack: ${error.stack}`);
     }
+
     return null;
   }
 
