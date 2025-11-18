@@ -15,7 +15,6 @@ import {
 } from '../utils/calculations.js';
 import { TIME_PERIODS } from '../config/constants.js';
 import { subDays, subMonths, subYears } from 'date-fns';
-import priceHistoryService from './priceHistoryService.js';
 import benchmarkService from './benchmarkService.js';
 
 class AnalyticsService {
@@ -105,17 +104,48 @@ class AnalyticsService {
     // Obtener todos los assets
     const assets = await Asset.find();
 
-    // Asegurar que existan precios históricos para todos los assets
+    // ========== OPTIMIZACIÓN: BATCH FETCH DE PRECIOS HISTÓRICOS ==========
+    // En lugar de 1,825 queries (365 días × 5 assets), hacer solo 5 queries
+    const priceMap = {};
+
     for (const asset of assets) {
-      const priceCount = await PriceHistory.countDocuments({ assetId: asset._id });
-      if (priceCount === 0) {
-        logger.warn(`⚠️  No price history found for asset ${asset.name}, fetching from API...`);
-        const prices = await priceHistoryService.generateSyntheticPriceHistory(asset._id);
-        if (prices.length === 0) {
-          logger.warn(`⚠️  No price data available for ${asset.name} (${asset.symbol})`);
+      const prices = await PriceHistory.find({
+        assetId: asset._id,
+        date: { $gte: startDate, $lte: endDate },
+      }).sort({ date: 1 }).select('date close');
+
+      // Crear lookup map para O(1) access
+      const assetIdStr = asset._id.toString();
+      priceMap[assetIdStr] = {};
+
+      prices.forEach((priceDoc) => {
+        const dateKey = priceDoc.date.toISOString().split('T')[0];
+        priceMap[assetIdStr][dateKey] = priceDoc.close;
+      });
+    }
+
+    // Helper para obtener precio más cercano
+    const getPriceForDate = (assetIdStr, date) => {
+      const dateKey = date.toISOString().split('T')[0];
+
+      // Intentar fecha exacta
+      if (priceMap[assetIdStr] && priceMap[assetIdStr][dateKey]) {
+        return priceMap[assetIdStr][dateKey];
+      }
+
+      // Buscar precio más reciente anterior a esta fecha
+      const assetPrices = priceMap[assetIdStr];
+      if (!assetPrices) return null;
+
+      const sortedDates = Object.keys(assetPrices).sort().reverse();
+      for (const priceDate of sortedDates) {
+        if (priceDate <= dateKey) {
+          return assetPrices[priceDate];
         }
       }
-    }
+
+      return null;
+    };
 
     // Crear timeline día por día
     const timeline = [];
@@ -151,7 +181,7 @@ class AnalyticsService {
         contributionIndex++;
       }
 
-      // NUEVO: Calcular valor total usando precios históricos REALES
+      // Calcular valor total usando precios históricos (ahora desde memoria)
       let totalValue = 0;
 
       for (const asset of assets) {
@@ -159,8 +189,8 @@ class AnalyticsService {
         const quantity = assetQuantities[assetIdStr] || 0;
 
         if (quantity > 0) {
-          // Obtener precio histórico para esta fecha
-          const price = await PriceHistory.getPriceAtDate(asset._id, currentDate);
+          // Obtener precio desde el map en memoria (O(1) lookup)
+          const price = getPriceForDate(assetIdStr, currentDate);
 
           if (price) {
             totalValue += quantity * price;
