@@ -39,21 +39,24 @@
 - **Historial de Aportaciones**: Registro completo de compras y ventas con cálculo automático de métricas
 - **Visualizaciones Interactivas**: Gráficos de distribución y rendimiento histórico
 - **Análisis de Rendimiento**: Métricas detalladas de ganancia/pérdida y ROI
+- **Historial de Precios**: Sistema OHLCV completo para análisis técnico
+- **Benchmarks**: Comparación con índices de referencia (S&P 500, EUROSTOXX, etc.)
 
 ### 🚀 Características Técnicas
 
 - **Responsive Design**: Funciona perfectamente en móvil, tablet y desktop
-- **Modo Oscuro**: Toggle entre temas claro, oscuro o automático con persistencia local
+- **Modo Oscuro**: ✅ Toggle entre temas claro, oscuro o automático con persistencia local
 - **Lazy Loading**: Carga diferida de componentes para mejor performance
 - **Smart Caching**: React Query con configuración optimizada de caché
-- **Auto-Save**: Guardado automático de formularios con debounce
-- **Export CSV**: Exporta datos de portafolios y transacciones
-- **Retry Logic**: Reintentos automáticos para requests fallidos
+- **Auto-Save**: ✅ Guardado automático de formularios con debounce
+- **Export CSV**: ✅ Exporta datos de portafolios y transacciones
+- **Retry Logic**: Reintentos automáticos con backoff exponencial
 - **Error Boundary**: Manejo elegante de errores con recovery
-- **Real-time Calculations**: Cálculos financieros automáticos y precisos
+- **Real-time Calculations**: Cálculos financieros automáticos con Decimal.js
 - **Modern Stack**: React 18, Node.js/Express, MongoDB Atlas
-- **State Management**: React Query para data fetching eficiente
-- **Testing**: Vitest para testing unitario y de integración
+- **State Management**: React Query 5.15 para data fetching eficiente
+- **Testing**: Vitest + Jest con coverage reporting
+- **API Integration**: Soporte para Yahoo Finance, CoinGecko, AlphaVantage, RapidAPI
 
 ---
 
@@ -90,7 +93,8 @@ Growing está construido con una arquitectura cliente-servidor moderna:
                      │
 ┌────────────────────▼─────────────────────────────────────────┐
 │  Database (MongoDB Atlas)                                    │
-│  - Collections: assets, contributions, portfolios, settings  │
+│  - Collections: assets, contributions, portfolios,           │
+│    settings, pricehistories, benchmarks                      │
 │  - Indexed queries para performance                          │
 └──────────────────────────────────────────────────────────────┘
 ```
@@ -257,7 +261,7 @@ VITE_API_BASE_URL=http://localhost:5000/api/v1
 
 # App Configuration
 VITE_APP_NAME=Growing
-VITE_APP_VERSION=1.0.0
+VITE_APP_VERSION=1.1.0
 ```
 
 ---
@@ -605,34 +609,44 @@ test('renders asset name', () => {
 
 ## 🗺️ Roadmap
 
-### Fase 1: MVP (Actual)
+### Fase 1: MVP ✅ Completado (v1.1.0)
 - [x] Arquitectura y documentación
-- [ ] CRUD de Assets
-- [ ] CRUD de Contributions
-- [ ] Sistema de Portfolios
-- [ ] Dashboard básico
-- [ ] Visualizaciones core
+- [x] CRUD de Assets
+- [x] CRUD de Contributions
+- [x] Sistema de Portfolios
+- [x] Dashboard con métricas en tiempo real
+- [x] Visualizaciones interactivas (Recharts)
+- [x] Historial de precios OHLCV
+- [x] Sistema de benchmarks
+- [x] Dark mode con persistencia
+- [x] Export CSV
+- [x] Auto-save de formularios
+- [x] Testing con Vitest y Jest
+- [x] Retry logic con backoff exponencial
+- [x] Error boundaries
 
-### Fase 2: Mejoras UX (Q2 2025)
+### Fase 2: API Integration & Automation (Q1 2025)
+- [ ] Actualización automática de precios (integración completa con APIs)
+- [ ] Import de datos (CSV, JSON)
+- [ ] Sistema de notificaciones por email
+- [ ] Actualización programada de precios (cron jobs)
+- [ ] Caché de precios con Redis
+
+### Fase 3: Features Avanzadas (Q2 2025)
 - [ ] Autenticación de usuarios (JWT)
-- [ ] Actualización automática de precios (APIs externas)
-- [ ] Export/Import de datos (CSV, JSON)
-- [ ] Dark mode
-- [ ] Responsive refinement
-
-### Fase 3: Features Avanzadas (Q3 2025)
-- [ ] Sistema de alertas y notificaciones
+- [ ] Multi-user support
+- [ ] Sistema de alertas de precios
 - [ ] Rebalanceo automático de portfolios
 - [ ] Reportes PDF
 - [ ] Multi-currency support
-- [ ] Comparación con benchmarks (S&P 500, etc.)
+- [ ] Análisis avanzado con AI
 
-### Fase 4: Escalabilidad (Q4 2025)
+### Fase 4: Escalabilidad (Q3 2025)
 - [ ] Multi-tenancy (múltiples usuarios)
 - [ ] Roles y permisos
 - [ ] API pública con rate limiting
-- [ ] Caché con Redis
 - [ ] Optimizaciones de performance
+- [ ] CDN para assets estáticos
 
 ### Ideas Futuras
 - 📱 App móvil (React Native)
