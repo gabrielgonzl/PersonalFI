@@ -121,25 +121,24 @@ AssetSchema.virtual('contributions', {
 });
 
 // Middleware pre-save: calcular métricas automáticamente
+// CORRECCIÓN: No recalculamos averagePrice ni totalInvested aquí porque deben
+// calcularse desde las contribuciones reales (incluyen fees) usando
+// assetService.recalculateAssetMetrics()
 AssetSchema.pre('save', function (next) {
-  // Calcular precio promedio
-  if (this.quantity > 0) {
-    this.averagePrice = this.totalInvested / this.quantity;
-  } else {
-    this.averagePrice = 0;
-  }
+  // Solo recalcular métricas derivadas si se modificó currentPrice o quantity
+  if (this.isModified('currentPrice') || this.isModified('quantity')) {
+    // Calcular valor actual
+    this.currentValue = this.quantity * this.currentPrice;
 
-  // Calcular valor actual
-  this.currentValue = this.quantity * this.currentPrice;
+    // Calcular ganancia/pérdida
+    this.profitLoss = this.currentValue - this.totalInvested;
 
-  // Calcular ganancia/pérdida
-  this.profitLoss = this.currentValue - this.totalInvested;
-
-  // Calcular porcentaje
-  if (this.totalInvested > 0) {
-    this.profitLossPercentage = (this.profitLoss / this.totalInvested) * 100;
-  } else {
-    this.profitLossPercentage = 0;
+    // Calcular porcentaje
+    if (this.totalInvested > 0) {
+      this.profitLossPercentage = (this.profitLoss / this.totalInvested) * 100;
+    } else {
+      this.profitLossPercentage = 0;
+    }
   }
 
   next();

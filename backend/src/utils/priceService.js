@@ -17,6 +17,7 @@
  */
 
 import axios from 'axios';
+import NodeCache from 'node-cache';
 import logger from '../config/logger.js';
 
 // Configuración de RapidAPI (para precios actuales)
@@ -33,9 +34,15 @@ const STEADYAPI_BASE_URL = process.env.STEADYAPI_BASE_URL || 'https://api.steady
 const MAX_RETRIES = 4;
 const INITIAL_RETRY_DELAY = 2000; // 2 segundos
 
-// Cache simple para evitar exceso de llamadas a la API
-const priceCache = new Map();
-const CACHE_TTL = 60000; // 1 minuto
+// MEJORA: Cache con node-cache (evita memory leaks, auto-limpieza)
+const priceCache = new NodeCache({
+  stdTTL: 60, // 60 segundos de TTL
+  checkperiod: 120, // Limpiar cada 2 minutos
+  maxKeys: 1000, // Máximo 1000 entradas en cache
+  deleteOnExpire: true,
+  useClones: false, // No clonar objetos para mejor performance
+});
+const CACHE_TTL = 60; // 1 minuto (en segundos)
 
 /**
  * Verificar si el modo automático está habilitado
@@ -46,28 +53,28 @@ const isAutoMode = () => {
 
 /**
  * Obtener precio de caché si existe y es válido
+ * MEJORA: Ahora usa node-cache que maneja TTL automáticamente
  */
 const getFromCache = (key) => {
   const cached = priceCache.get(key);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+  if (cached) {
     logger.debug(`Price cache HIT for ${key}`);
-    return cached.data;
+    return cached;
   }
+  logger.debug(`Price cache MISS for ${key}`);
   return null;
 };
 
 /**
  * Guardar precio en caché
+ * MEJORA: node-cache maneja TTL y limpieza automáticamente
  */
 const saveToCache = (key, data) => {
-  priceCache.set(key, {
-    data,
-    timestamp: Date.now(),
-  });
+  priceCache.set(key, data, CACHE_TTL);
 };
 
 /**
- * Implementar sleep para reintentos con backoff exponencial
+ * Implementar sleep para reintentos con backoff exponencial + jitter
  */
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -99,8 +106,11 @@ const fetchFromRapidAPI = async (endpoint, symbol, retryCount = 0) => {
 
     // Reintentar solo si es un error de red/servidor y no hemos excedido los reintentos
     if (isNetworkError && retryCount < MAX_RETRIES) {
-      const delay = INITIAL_RETRY_DELAY * Math.pow(2, retryCount); // Backoff exponencial: 2s, 4s, 8s, 16s
-      logger.warn(`Network error for ${symbol}, retrying in ${delay}ms... (${retryCount + 1}/${MAX_RETRIES})`);
+      // MEJORA: Backoff exponencial CON jitter para evitar thundering herd
+      const baseDelay = INITIAL_RETRY_DELAY * Math.pow(2, retryCount); // 2s, 4s, 8s, 16s
+      const jitter = Math.random() * 1000; // Jitter aleatorio 0-1000ms
+      const delay = baseDelay + jitter;
+      logger.warn(`Network error for ${symbol}, retrying in ${delay.toFixed(0)}ms... (${retryCount + 1}/${MAX_RETRIES})`);
 
       await sleep(delay);
       return fetchFromRapidAPI(endpoint, symbol, retryCount + 1);
@@ -539,16 +549,24 @@ export const searchSymbols = async (query) => {
 
 /**
  * Obtener información del modo de precios
+ * MEJORA: Ahora incluye estadísticas del cache node-cache
  * @returns {Object} - Información del modo actual
  */
 export const getPriceServiceInfo = () => {
+  const stats = priceCache.getStats();
   return {
     mode: PRICE_UPDATE_MODE,
     autoEnabled: isAutoMode(),
     apiConfigured: !!(RAPIDAPI_KEY && RAPIDAPI_KEY !== 'your_rapidapi_key_here'),
     host: RAPIDAPI_HOST,
-    cacheSize: priceCache.size,
-    cacheTTL: CACHE_TTL,
+    cache: {
+      size: priceCache.keys().length,
+      ttl: CACHE_TTL,
+      maxKeys: 1000,
+      hits: stats.hits,
+      misses: stats.misses,
+      keys: stats.keys,
+    },
     maxRetries: MAX_RETRIES,
     initialRetryDelay: INITIAL_RETRY_DELAY,
   };
@@ -556,10 +574,12 @@ export const getPriceServiceInfo = () => {
 
 /**
  * Limpiar caché de precios
+ * MEJORA: Usa métodos de node-cache
  */
 export const clearPriceCache = () => {
-  const size = priceCache.size;
-  priceCache.clear();
+  const keys = priceCache.keys();
+  const size = keys.length;
+  priceCache.flushAll();
   logger.info(`Price cache cleared: ${size} entries removed`);
   return { cleared: size };
 };

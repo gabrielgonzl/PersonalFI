@@ -4,9 +4,11 @@
 
 import priceService from '../utils/priceService.js';
 import assetService from '../services/assetService.js';
-import { Asset } from '../models/index.js';
+import { Asset, PriceHistory } from '../models/index.js';
 import { successResponse } from '../utils/helpers.js';
 import { HTTP_STATUS } from '../config/constants.js';
+import { startOfDay } from 'date-fns';
+import logger from '../config/logger.js';
 
 class PriceController {
   /**
@@ -132,6 +134,7 @@ class PriceController {
   /**
    * POST /prices/update/:assetId
    * Actualizar precio de un asset específico desde API
+   * MEJORA: También guarda en PriceHistory automáticamente
    */
   async updateAssetPrice(req, res, next) {
     try {
@@ -152,8 +155,38 @@ class PriceController {
         return res.json(successResponse(null, 'Price data not available. Check if auto mode is enabled.'));
       }
 
-      // Actualizar precio del asset
+      // Actualizar precio del asset (assetService.updatePrice ya guarda en PriceHistory)
       const updatedAsset = await assetService.updatePrice(assetId, priceData.price);
+
+      // MEJORA: Si tenemos datos OHLC de la API, guardarlos también
+      if (priceData.dayHigh && priceData.dayLow && priceData.previousClose) {
+        try {
+          const today = startOfDay(new Date());
+
+          await PriceHistory.findOneAndUpdate(
+            {
+              assetId: asset._id,
+              date: today,
+            },
+            {
+              $set: {
+                open: priceData.previousClose,
+                high: priceData.dayHigh,
+                low: priceData.dayLow,
+                close: priceData.price,
+                volume: priceData.volume || 0,
+                source: 'yahoo_finance', // Marcado como datos de Yahoo Finance
+                currency: priceData.currency || asset.currency,
+              },
+            },
+            { upsert: true }
+          );
+
+          logger.debug(`Saved OHLC data to PriceHistory for ${asset.symbol}`);
+        } catch (error) {
+          logger.warn(`Failed to save OHLC data for ${asset.symbol}: ${error.message}`);
+        }
+      }
 
       res.json(successResponse({
         asset: updatedAsset,
