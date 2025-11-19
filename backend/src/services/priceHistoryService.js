@@ -3,6 +3,7 @@
  */
 import { PriceHistory, Asset, Contribution } from '../models/index.js';
 import { subDays, subMonths, eachDayOfInterval, startOfDay } from 'date-fns';
+import logger from '../config/logger.js';
 
 class PriceHistoryService {
   /**
@@ -24,7 +25,7 @@ class PriceHistoryService {
     const contributions = await Contribution.find({ assetId }).sort({ date: 1 });
 
     if (contributions.length === 0) {
-      console.log(`No contributions found for asset ${assetId}`);
+      logger.debug(`No contributions found for asset ${assetId}`);
       return [];
     }
 
@@ -42,8 +43,8 @@ class PriceHistoryService {
     const coveragePercentage = (existingPricesCount / expectedDays) * 100;
 
     if (coveragePercentage > 80) {
-      console.log(`   ✅ Ya existen ${existingPricesCount} precios REALES en MongoDB para ${asset.symbol} (${coveragePercentage.toFixed(0)}% cobertura)`);
-      console.log(`   ⏭️  Saltando llamada a API (usando datos existentes)`);
+      logger.info(`✅ Ya existen ${existingPricesCount} precios REALES en MongoDB para ${asset.symbol} (${coveragePercentage.toFixed(0)}% cobertura)`);
+      logger.info(`⏭️  Saltando llamada a API (usando datos existentes)`);
       
       // Retornar datos existentes
       const existingPrices = await PriceHistory.find({
@@ -65,7 +66,7 @@ class PriceHistoryService {
     }
 
     // ========== PASO 2: INTENTAR OBTENER DATOS REALES DE STEADYAPI ==========
-    console.log(`   🔍 Obteniendo datos REALES de SteadyAPI para ${asset.symbol}...`);
+    logger.info(`🔍 Obteniendo datos REALES de SteadyAPI para ${asset.symbol}...`);
     const priceService = await import('../utils/priceService.js');
     
     try {
@@ -98,17 +99,17 @@ class PriceHistoryService {
           currency: asset.currency,
         }));
 
-        console.log(`   ✅ Obtenidos ${prices.length} precios REALES de SteadyAPI para ${asset.symbol}`);
-        console.log(`   💾 Guardando en MongoDB para reutilizar...`);
+        logger.info(`✅ Obtenidos ${prices.length} precios REALES de SteadyAPI para ${asset.symbol}`);
+        logger.info(`💾 Guardando en MongoDB para reutilizar...`);
         
         return prices;
       }
     } catch (error) {
-      console.log(`   ⚠️  Error al obtener datos de SteadyAPI: ${error.message}`);
+      logger.warn(`⚠️  Error al obtener datos de SteadyAPI: ${error.message}`);
     }
 
     // ========== PASO 3: FALLBACK A DATOS SINTÉTICOS ==========
-    console.log(`   📊 Generando precios sintéticos para ${asset.symbol} (API no disponible)...`);
+    logger.info(`📊 Generando precios sintéticos para ${asset.symbol} (API no disponible)...`);
     const prices = [];
 
     // Generar precios diarios usando interpolación y volatilidad sintética
@@ -197,7 +198,7 @@ class PriceHistoryService {
 
     for (const asset of assets) {
       try {
-        console.log(`Generating price history for ${asset.name} (${asset.symbol})...`);
+        logger.info(`Generating price history for ${asset.name} (${asset.symbol})...`);
         const prices = await this.generateSyntheticPriceHistory(asset._id);
 
         if (prices.length > 0) {
@@ -208,10 +209,10 @@ class PriceHistoryService {
             pricesGenerated: prices.length,
             success: true,
           });
-          console.log(`✓ Generated ${prices.length} price points for ${asset.name}`);
+          logger.info(`✓ Generated ${prices.length} price points for ${asset.name}`);
         }
       } catch (error) {
-        console.error(`✗ Error generating prices for ${asset.name}:`, error.message);
+        logger.error(`✗ Error generating prices for ${asset.name}:`, error.message);
         results.push({
           assetId: asset._id,
           name: asset.name,
@@ -233,7 +234,7 @@ class PriceHistoryService {
 
     if (count === 0) {
       // Generar precios sintéticos si no existen
-      console.log(`No price history found for asset ${assetId}, generating synthetic data...`);
+      logger.info(`No price history found for asset ${assetId}, generating synthetic data...`);
       const prices = await this.generateSyntheticPriceHistory(assetId);
       if (prices.length > 0) {
         await PriceHistory.bulkInsertPrices(prices);

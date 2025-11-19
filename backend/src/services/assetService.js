@@ -2,10 +2,11 @@
  * Servicio de lógica de negocio para Assets
  */
 
-import { Asset, Contribution, Portfolio } from '../models/index.js';
+import { Asset, Contribution, Portfolio, PriceHistory } from '../models/index.js';
 import { AppError } from '../middleware/errorHandler.js';
 import { HTTP_STATUS, ERROR_CODES } from '../config/constants.js';
 import logger from '../config/logger.js';
+import { startOfDay } from 'date-fns';
 
 class AssetService {
   /**
@@ -263,6 +264,7 @@ class AssetService {
 
   /**
    * Actualizar precio de un asset
+   * MEJORA: Ahora también guarda el precio en PriceHistory para mantener histórico
    */
   async updatePrice(id, newPrice) {
     // No permitir actualizar precio de assets virtuales
@@ -288,16 +290,54 @@ class AssetService {
       throw new AppError('Asset no encontrado', HTTP_STATUS.NOT_FOUND, ERROR_CODES.RESOURCE_NOT_FOUND);
     }
 
+    const oldPrice = asset.currentPrice;
     asset.currentPrice = newPrice;
     asset.lastPriceUpdate = new Date();
     await asset.save();
+
+    // MEJORA: Guardar el precio en PriceHistory como punto histórico
+    try {
+      const today = startOfDay(new Date());
+
+      // Verificar si ya existe un precio para hoy
+      const existingPrice = await PriceHistory.findOne({
+        assetId: asset._id,
+        date: today,
+      });
+
+      if (existingPrice) {
+        // Actualizar el precio existente de hoy
+        existingPrice.close = newPrice;
+        existingPrice.high = Math.max(existingPrice.high, newPrice);
+        existingPrice.low = Math.min(existingPrice.low, newPrice);
+        await existingPrice.save();
+        logger.debug(`Updated today's price in PriceHistory for ${asset.symbol}`);
+      } else {
+        // Crear nuevo registro de precio histórico
+        await PriceHistory.create({
+          assetId: asset._id,
+          date: today,
+          open: oldPrice || newPrice,
+          high: newPrice,
+          low: newPrice,
+          close: newPrice,
+          volume: 0,
+          source: 'manual', // Marcado como manual ya que fue actualizado manualmente
+          currency: asset.currency,
+        });
+        logger.debug(`Created new price history entry for ${asset.symbol}`);
+      }
+    } catch (error) {
+      // No fallar si hay error guardando histórico, solo loguear
+      logger.warn(`Failed to save price history for ${asset.symbol}: ${error.message}`);
+    }
 
     // Si el asset pertenece a un portfolio, actualizar métricas del portfolio
     if (asset.portfolioId) {
       await this.updatePortfolioMetrics(asset.portfolioId);
     }
 
-    logger.info(`Price updated for ${asset.name}: ${newPrice}`);
+    logger.info(`Price updated for ${asset.name}: ${oldPrice} → ${newPrice}`);
     return asset;
   }
 

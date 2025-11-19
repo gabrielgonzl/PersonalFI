@@ -298,6 +298,7 @@ export const calculateRebalanceNeeds = (currentAllocation, targetAllocation) => 
 
 /**
  * Calcular evolución temporal del portfolio
+ * CORRECCIÓN: En ventas, se resta el costo base proporcional (método Average Cost)
  * @param {Array} contributions - Todas las contribuciones ordenadas por fecha
  * @param {number} currentPrice - Precio actual
  * @returns {Array} Timeline con { date, invested, value, profitLoss }
@@ -314,21 +315,32 @@ export const calculateTimeline = (contributions, currentPrice) => {
 
   sorted.forEach((contrib) => {
     if (contrib.type === 'buy') {
-      cumulativeInvested += contrib.totalAmount;
+      // Agregar el costo total (incluye fees)
+      cumulativeInvested += contrib.totalAmount + (contrib.fees || 0);
       cumulativeQuantity += contrib.quantity;
     } else if (contrib.type === 'sell') {
-      // El invested no cambia en ventas, solo la cantidad
-      // cumulativeInvested representa el dinero total que se ha invertido, no el valor actual
+      // CORRECCIÓN: Restar el costo base proporcional de las unidades vendidas
+      // Usamos método Average Cost (precio promedio ponderado)
+      const averageCostBasis = cumulativeQuantity > 0 ? cumulativeInvested / cumulativeQuantity : 0;
+      const costOfSoldUnits = contrib.quantity * averageCostBasis;
+
+      // Restar el costo base de las unidades vendidas
+      cumulativeInvested -= costOfSoldUnits;
+
+      // Restar fees de venta del capital invertido (costos de transacción)
+      cumulativeInvested -= (contrib.fees || 0);
+
+      // Reducir cantidad
       cumulativeQuantity -= contrib.quantity;
     }
 
-    const value = cumulativeQuantity * contrib.pricePerUnit;
+    const valueAtTransaction = cumulativeQuantity * contrib.pricePerUnit;
 
     timeline.push({
       date: contrib.date,
       invested: Number(cumulativeInvested.toFixed(2)),
-      value: Number(value.toFixed(2)),
-      profitLoss: Number((value - cumulativeInvested).toFixed(2)),
+      value: Number(valueAtTransaction.toFixed(2)),
+      profitLoss: Number((valueAtTransaction - cumulativeInvested).toFixed(2)),
     });
   });
 
