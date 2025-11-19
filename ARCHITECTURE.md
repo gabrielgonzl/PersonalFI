@@ -299,6 +299,14 @@ PersonalFI/
 
 ## 🗄️ Schemas de Base de Datos
 
+**Colecciones MongoDB**: 6 colecciones principales
+- `assets` - Activos financieros individuales
+- `contributions` - Historial de transacciones
+- `portfolios` - Carteras de inversión
+- `settings` - Configuración global
+- `pricehistories` - Historial de precios OHLCV
+- `benchmarks` - Índices de referencia
+
 ### 1. Asset (Activo Individual)
 
 Un activo representa una inversión específica (crypto, acción, ETF, fondo).
@@ -473,6 +481,93 @@ Configuración de la aplicación (colección singleton).
 
 ---
 
+### 5. PriceHistory (Historial de Precios)
+
+Almacena historial de precios OHLCV para análisis técnico.
+
+```javascript
+{
+  _id: ObjectId,
+  assetId: ObjectId,               // Referencia al Asset
+  date: Date,                      // Fecha del registro
+
+  // Datos OHLCV
+  open: Number,                    // Precio de apertura
+  high: Number,                    // Precio máximo
+  low: Number,                     // Precio mínimo
+  close: Number,                   // Precio de cierre
+  volume: Number,                  // Volumen de trading
+
+  // Metadata
+  source: String,                  // Enum: ['manual', 'yahoo', 'coingecko',
+                                   //        'alphavantage', 'rapidapi', 'steadyapi']
+  currency: String,                // Moneda (ej: "USD", "EUR")
+
+  // Timestamps
+  createdAt: Date,
+  updatedAt: Date
+}
+```
+
+**Índices:**
+- `{ assetId: 1, date: -1 }` - Historial por activo
+- `{ date: -1 }` - Ordenamiento temporal
+
+**Métodos estáticos:**
+- `getPriceAtDate(assetId, date)` - Obtener precio en fecha específica
+- `getPriceRange(assetId, startDate, endDate)` - Rango de precios
+- `getLatestPrice(assetId)` - Último precio conocido
+- `aggregateByGranularity(assetId, start, end, granularity)` - Agregar por día/semana/mes
+- `calculateReturns(assetId, start, end)` - Calcular retornos diarios
+- `bulkInsertPrices(pricesArray)` - Inserción masiva optimizada
+
+---
+
+### 6. Benchmark (Índice de Referencia)
+
+Índices de mercado para comparación (S&P 500, EUROSTOXX 50, etc.).
+
+```javascript
+{
+  _id: ObjectId,
+  name: String,                    // Nombre completo (ej: "S&P 500")
+  symbol: String,                  // Símbolo único (ej: "SPX", "^GSPC")
+  description: String,             // Descripción del índice
+
+  // Clasificación
+  category: String,                // Enum: ['stocks', 'bonds', 'crypto',
+                                   //        'commodities', 'mixed', 'other']
+  region: String,                  // Enum: ['us', 'europe', 'asia',
+                                   //        'global', 'emerging', 'other']
+  currency: String,                // Moneda del índice
+
+  // Estado
+  isActive: Boolean,               // Si está activo para uso
+
+  // API externa
+  externalId: String,              // ID en sistema externo
+  dataSource: String,              // Enum: ['yahoo', 'alphavantage', 'manual']
+
+  // Timestamps
+  createdAt: Date,
+  updatedAt: Date
+}
+```
+
+**Índices:**
+- `{ symbol: 1 }` - Búsqueda por símbolo (único)
+- `{ category: 1, isActive: 1 }` - Filtrado por categoría
+- `{ region: 1 }` - Filtrado por región
+
+**Métodos estáticos:**
+- `getActive()` - Obtener benchmarks activos
+- `getBySymbol(symbol)` - Buscar por símbolo
+- `getByCategory(category)` - Filtrar por categoría
+
+**Nota**: Los precios históricos de benchmarks se almacenan en `PriceHistory` vinculados por `assetId` (el benchmark se trata como un asset especial para el historial de precios).
+
+---
+
 ## 🔌 API Endpoints
 
 ### Base URL
@@ -518,7 +613,17 @@ http://localhost:5000/api/v1
 | GET | `/portfolios/:id/allocation` | Obtener distribución de la cartera |
 | POST | `/portfolios/:id/rebalance` | Rebalancear según target allocation |
 
-### 4. Analytics Endpoints
+### 4. Prices Endpoints
+
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | `/prices/:assetId` | Obtener historial de precios de un asset |
+| POST | `/prices/:assetId` | Agregar precio manual |
+| GET | `/prices/:assetId/latest` | Obtener último precio conocido |
+| POST | `/prices/fetch` | Actualizar precios desde API externa |
+| DELETE | `/prices/:id` | Eliminar registro de precio |
+
+### 5. Analytics Endpoints
 
 | Método | Endpoint | Descripción |
 |--------|----------|-------------|
@@ -528,7 +633,7 @@ http://localhost:5000/api/v1
 | GET | `/analytics/timeline` | Línea de tiempo de inversiones |
 | GET | `/analytics/top-performers` | Mejores activos por rendimiento |
 
-### 5. Settings Endpoints
+### 6. Settings Endpoints
 
 | Método | Endpoint | Descripción |
 |--------|----------|-------------|
@@ -884,5 +989,5 @@ totalValue = cashBalance + Σ(asset.currentValue)
 ---
 
 **Documento creado por**: Claude (AI Project Manager & Software Architect)
-**Fecha**: 2025-11-14
-**Versión**: 1.0.0
+**Fecha**: 2025-11-19
+**Versión**: 1.1.0

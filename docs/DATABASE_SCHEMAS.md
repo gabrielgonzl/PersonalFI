@@ -66,6 +66,37 @@
 │  │ apiKeys: { ... }                                    │    │
 │  └────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│                       PRICEHISTORY                           │
+│  ┌────────────────────────────────────────────────────┐    │
+│  │ _id: ObjectId                                       │    │
+│  │ assetId: ObjectId (ref Asset)                      │    │
+│  │ date: 2024-01-15                                    │    │
+│  │ open: 40000.00                                      │    │
+│  │ high: 42000.00                                      │    │
+│  │ low: 39500.00                                       │    │
+│  │ close: 41500.00                                     │    │
+│  │ volume: 12345678                                    │    │
+│  │ source: "yahoo"                                     │    │
+│  │ currency: "USD"                                     │    │
+│  └────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│                        BENCHMARK                             │
+│  ┌────────────────────────────────────────────────────┐    │
+│  │ _id: ObjectId                                       │    │
+│  │ name: "S&P 500"                                     │    │
+│  │ symbol: "^GSPC"                                     │    │
+│  │ description: "Índice bursátil de USA"              │    │
+│  │ category: "stocks"                                  │    │
+│  │ region: "us"                                        │    │
+│  │ currency: "USD"                                     │    │
+│  │ isActive: true                                      │    │
+│  │ dataSource: "yahoo"                                 │    │
+│  └────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -696,6 +727,225 @@ SettingsSchema.statics.getInstance = async function() {
 
 ---
 
+## 5. 📈 Collection: `pricehistories`
+
+### Descripción
+Almacena historial de precios OHLCV (Open, High, Low, Close, Volume) para análisis técnico y seguimiento de rendimiento.
+
+### Schema
+
+```javascript
+const PriceHistorySchema = new mongoose.Schema({
+  // Relación con Asset
+  assetId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Asset',
+    required: true,
+    index: true
+  },
+
+  // Fecha del registro
+  date: {
+    type: Date,
+    required: true,
+    index: true
+  },
+
+  // Datos OHLCV
+  open: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+  high: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+  low: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+  close: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+  volume: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+
+  // Metadata
+  source: {
+    type: String,
+    enum: ['manual', 'yahoo', 'coingecko', 'alphavantage', 'api', 'rapidapi', 'steadyapi', 'synthetic'],
+    default: 'manual'
+  },
+  currency: {
+    type: String,
+    required: true,
+    uppercase: true,
+    default: 'EUR'
+  }
+}, {
+  timestamps: true
+});
+
+// Índices compuestos
+PriceHistorySchema.index({ assetId: 1, date: -1 });
+PriceHistorySchema.index({ date: -1 });
+
+// Métodos estáticos
+PriceHistorySchema.statics.getPriceAtDate = async function(assetId, date) {
+  const price = await this.findOne({
+    assetId,
+    date: { $lte: date }
+  }).sort({ date: -1 }).limit(1);
+
+  return price ? price.close : null;
+};
+
+PriceHistorySchema.statics.getLatestPrice = async function(assetId) {
+  const latest = await this.findOne({ assetId }).sort({ date: -1 }).limit(1);
+  return latest ? latest.close : null;
+};
+
+PriceHistorySchema.statics.bulkInsertPrices = async function(pricesArray) {
+  if (!pricesArray || pricesArray.length === 0) return;
+
+  const operations = pricesArray.map(price => ({
+    updateOne: {
+      filter: { assetId: price.assetId, date: price.date },
+      update: { $set: price },
+      upsert: true
+    }
+  }));
+
+  return this.bulkWrite(operations);
+};
+```
+
+### Ejemplo de Documento
+
+```json
+{
+  "_id": "507f1f77bcf86cd799439017",
+  "assetId": "507f1f77bcf86cd799439011",
+  "date": "2024-01-15T00:00:00.000Z",
+  "open": 40000.00,
+  "high": 42000.00,
+  "low": 39500.00,
+  "close": 41500.00,
+  "volume": 12345678,
+  "source": "yahoo",
+  "currency": "USD",
+  "createdAt": "2024-01-15T10:00:00.000Z",
+  "updatedAt": "2024-01-15T10:00:00.000Z"
+}
+```
+
+---
+
+## 6. 📊 Collection: `benchmarks`
+
+### Descripción
+Almacena índices de referencia del mercado (S&P 500, EUROSTOXX 50, etc.) para comparación de rendimiento.
+
+### Schema
+
+```javascript
+const BenchmarkSchema = new mongoose.Schema({
+  // Identificación
+  name: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  symbol: {
+    type: String,
+    required: true,
+    unique: true,
+    uppercase: true,
+    trim: true,
+    index: true
+  },
+  description: {
+    type: String,
+    trim: true
+  },
+
+  // Clasificación
+  category: {
+    type: String,
+    enum: ['stocks', 'bonds', 'crypto', 'commodities', 'mixed', 'other'],
+    default: 'stocks'
+  },
+  region: {
+    type: String,
+    enum: ['us', 'europe', 'asia', 'global', 'emerging', 'other'],
+    default: 'global'
+  },
+  currency: {
+    type: String,
+    required: true,
+    uppercase: true,
+    default: 'USD'
+  },
+
+  // Estado
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+
+  // API externa
+  externalId: {
+    type: String,
+    trim: true
+  },
+  dataSource: {
+    type: String,
+    enum: ['yahoo', 'alphavantage', 'manual'],
+    default: 'yahoo'
+  }
+}, {
+  timestamps: true
+});
+
+// Métodos estáticos
+BenchmarkSchema.statics.getActive = async function() {
+  return this.find({ isActive: true }).sort({ name: 1 });
+};
+
+BenchmarkSchema.statics.getBySymbol = async function(symbol) {
+  return this.findOne({ symbol: symbol.toUpperCase(), isActive: true });
+};
+```
+
+### Ejemplo de Documento
+
+```json
+{
+  "_id": "507f1f77bcf86cd799439018",
+  "name": "S&P 500",
+  "symbol": "^GSPC",
+  "description": "Índice bursátil que incluye las 500 empresas más grandes de EE.UU.",
+  "category": "stocks",
+  "region": "us",
+  "currency": "USD",
+  "isActive": true,
+  "externalId": "^GSPC",
+  "dataSource": "yahoo",
+  "createdAt": "2024-01-01T00:00:00.000Z",
+  "updatedAt": "2024-01-01T00:00:00.000Z"
+}
+```
+
+---
+
 ## 🔗 Relaciones entre Colecciones
 
 ### 1. Portfolio → Assets (1:N)
@@ -708,9 +958,18 @@ SettingsSchema.statics.getInstance = async function() {
 - Una Contribution pertenece a un único Asset
 - Campo: `Contribution.assetId` → `Asset._id`
 
-### 3. Portfolio → Target Allocation → Assets (M:N)
+### 3. Asset → PriceHistories (1:N)
+- Un Asset tiene múltiples registros de precios históricos
+- Un PriceHistory pertenece a un único Asset
+- Campo: `PriceHistory.assetId` → `Asset._id`
+
+### 4. Portfolio → Target Allocation → Assets (M:N)
 - Un Portfolio define distribución objetivo para varios Assets
 - Array embebido: `Portfolio.targetAllocation[].assetId`
+
+### 5. Benchmarks (Independiente)
+- Los Benchmarks son entidades independientes usadas para comparación
+- Se relacionan con PriceHistories para almacenar su evolución histórica
 
 ---
 
@@ -792,4 +1051,5 @@ db.contributions.aggregate([
 
 ---
 
-**Última actualización**: 2025-11-14
+**Última actualización**: 2025-11-19
+**Versión**: 1.1.0

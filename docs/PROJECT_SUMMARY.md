@@ -68,7 +68,8 @@ Hosting:   Vercel (Frontend) + Railway/Render (Backend)
 │                       │                                          │
 │  ┌────────────────────▼───────────────────────────────────────┐ │
 │  │  Models Layer (Mongoose Schemas)                           │ │
-│  │  - Asset, Contribution, Portfolio, Settings                │ │
+│  │  - Asset, Contribution, Portfolio, Settings,               │ │
+│  │    PriceHistory, Benchmark                                 │ │
 │  └────────────────────────────────────────────────────────────┘ │
 └────────────────────────┬────────────────────────────────────────┘
                          │
@@ -82,6 +83,8 @@ Hosting:   Vercel (Frontend) + Railway/Render (Backend)
 │  │  - contributions (historial de transacciones)              │ │
 │  │  - portfolios    (carteras de activos)                     │ │
 │  │  - settings      (configuración global)                    │ │
+│  │  - pricehistories (historial OHLCV de precios)             │ │
+│  │  - benchmarks    (índices de referencia)                   │ │
 │  └────────────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -101,6 +104,17 @@ Hosting:   Vercel (Frontend) + Railway/Render (Backend)
 │ - totalValue │        │ - type       │        │ - quantity   │
 └──────────────┘        │ - quantity   │        │ - price      │
                         │ - value      │        └──────────────┘
+                        └──────┬───────┘
+                               │ 1
+                               │
+                               │ N
+                        ┌──────▼───────┐
+                        │ PRICEHISTORY │
+                        │              │
+                        │ - date       │
+                        │ - open/close │
+                        │ - high/low   │
+                        │ - volume     │
                         └──────────────┘
 
 ┌──────────────┐
@@ -110,12 +124,23 @@ Hosting:   Vercel (Frontend) + Railway/Render (Backend)
 │ - theme      │
 │ - apiKeys    │
 └──────────────┘
+
+┌──────────────┐
+│  BENCHMARK   │ (Independiente)
+│              │
+│ - name       │
+│ - symbol     │
+│ - category   │
+│ - region     │
+└──────────────┘
 ```
 
 ### Relaciones
 - **Portfolio → Assets**: 1 a N (un portfolio contiene muchos assets)
 - **Asset → Contributions**: 1 a N (un asset tiene muchas contribuciones)
+- **Asset → PriceHistories**: 1 a N (un asset tiene múltiples registros de precios)
 - **Portfolio ← Asset**: N a 1 (un asset puede pertenecer a un portfolio o ser independiente)
+- **Benchmark**: Independiente (usado para comparación)
 
 ---
 
@@ -304,22 +329,30 @@ PersonalFI/
 
 ## 🎯 Core Features Checklist
 
-### MVP (Minimum Viable Product)
-- [ ] CRUD Assets (create, read, update, delete)
-- [ ] CRUD Contributions (registrar compras/ventas)
-- [ ] CRUD Portfolios (crear y gestionar carteras)
-- [ ] Dashboard con stats básicos
-- [ ] Visualización de distribución (pie chart)
-- [ ] Gráfico de rendimiento histórico
-- [ ] Distribución de efectivo en portfolios
+### MVP ✅ Completado (v1.1.0)
+- [x] CRUD Assets (create, read, update, delete)
+- [x] CRUD Contributions (registrar compras/ventas)
+- [x] CRUD Portfolios (crear y gestionar carteras)
+- [x] Dashboard con métricas en tiempo real
+- [x] Visualización de distribución (pie chart)
+- [x] Gráfico de rendimiento histórico
+- [x] Distribución de efectivo en portfolios
+- [x] Historial de precios OHLCV
+- [x] Sistema de benchmarks
+- [x] Dark mode con persistencia
+- [x] Export CSV
+- [x] Auto-save de formularios
+- [x] Testing (Vitest + Jest)
+- [x] Error boundaries
+- [x] Retry logic con backoff exponencial
 
 ### V2 (Future Enhancements)
-- [ ] Autenticación de usuarios
-- [ ] Actualización automática de precios (APIs)
-- [ ] Sistema de alertas
-- [ ] Export/Import de datos
-- [ ] Dark mode
-- [ ] Multi-currency
+- [ ] Autenticación de usuarios (JWT)
+- [ ] Actualización automática de precios (integración completa con APIs)
+- [ ] Sistema de alertas y notificaciones
+- [ ] Import de datos (CSV, JSON)
+- [ ] Multi-currency support
+- [ ] Reportes PDF
 
 ---
 
@@ -343,6 +376,6 @@ PersonalFI/
 
 ---
 
-**Last Updated**: 2025-11-14
-**Version**: 1.0.0
-**Status**: Architecture Phase Complete ✅
+**Last Updated**: 2025-11-19
+**Version**: 1.1.0
+**Status**: MVP Complete ✅ - Production Ready
