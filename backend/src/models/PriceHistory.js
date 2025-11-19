@@ -47,7 +47,7 @@ const PriceHistorySchema = new mongoose.Schema(
     // Metadata
     source: {
       type: String,
-      enum: ['manual', 'yahoo', 'coingecko', 'alphavantage', 'api'],
+      enum: ['manual', 'yahoo', 'coingecko', 'alphavantage', 'api', 'rapidapi', 'steadyapi', 'synthetic'],
       default: 'manual',
     },
     currency: {

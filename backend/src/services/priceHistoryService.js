@@ -36,7 +36,7 @@ class PriceHistoryService {
     const existingPricesCount = await PriceHistory.countDocuments({
       assetId,
       date: { $gte: firstDate, $lte: lastDate },
-      source: { $in: ['steadyapi', 'yahoo_finance', 'api'] }, // Solo datos reales, no sintéticos
+      source: { $in: ['steadyapi', 'rapidapi', 'api', 'manual'] }, // Solo datos reales, no sintéticos
     });
 
     const expectedDays = Math.ceil((lastDate - firstDate) / (1000 * 60 * 60 * 24));
