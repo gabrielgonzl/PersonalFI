@@ -1,13 +1,54 @@
 import winston from 'winston';
+import chalk from 'chalk';
 
-const { combine, timestamp, printf, colorize, errors } = winston.format;
+const { combine, timestamp, printf, errors } = winston.format;
 
-// Definir formato personalizado
-const customFormat = printf(({ level, message, timestamp, stack }) => {
+// Mapeo de emojis por nivel de log
+const levelEmojis = {
+  error: '❌',
+  warn: '⚠️ ',
+  info: 'ℹ️ ',
+  http: '🌐',
+  verbose: '💬',
+  debug: '🔍',
+  silly: '🎭',
+};
+
+// Colores personalizados para cada nivel
+const levelColors = {
+  error: chalk.red.bold,
+  warn: chalk.yellow.bold,
+  info: chalk.cyan,
+  http: chalk.magenta,
+  verbose: chalk.gray,
+  debug: chalk.blue,
+  silly: chalk.white,
+};
+
+// Formato personalizado con emojis y colores
+const customFormat = printf(({ level, message, timestamp, stack, ...metadata }) => {
+  const emoji = levelEmojis[level] || '';
+  const color = levelColors[level] || ((text) => text);
+
+  // Timestamp con formato más legible
+  const time = chalk.gray(timestamp);
+
+  // Nivel de log con emoji y color
+  const levelFormatted = color(`${emoji} ${level.toUpperCase().padEnd(7)}`);
+
+  // Mensaje con stack trace si existe
+  let output = `${time} ${levelFormatted} ${message}`;
+
   if (stack) {
-    return `${timestamp} [${level}]: ${message}\n${stack}`;
+    output += `\n${chalk.gray(stack)}`;
   }
-  return `${timestamp} [${level}]: ${message}`;
+
+  // Metadatos adicionales si existen
+  if (Object.keys(metadata).length > 0) {
+    output += `\n${chalk.gray(JSON.stringify(metadata, null, 2))}`;
+  }
+
+  return output;
 });
 
 // Niveles de log según ambiente
@@ -23,13 +64,7 @@ const logger = winston.createLogger({
   ),
   transports: [
     // Console transport (siempre activo)
-    new winston.transports.Console({
-      format: combine(
-        colorize(),
-        timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-        customFormat
-      ),
-    }),
+    new winston.transports.Console(),
   ],
 });
 
